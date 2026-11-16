@@ -10932,7 +10932,7 @@
 
     // Searchable Cross-Shift Hire-Back Personnel Database Popover
     let hireBackDbState = {
-      shiftFilter: 'OTHER', // 'OTHER' | 'ALL' | 'A' | 'B' | 'C'
+      shiftFilter: 'ALL', // 'A' | 'B' | 'C' | 'ALL'
       preferredDiv: null,
       preferredUnit: null
     };
@@ -10941,7 +10941,7 @@
       if (event) event.stopPropagation();
       hireBackDbState.preferredDiv = preferredDiv;
       hireBackDbState.preferredUnit = preferredUnit;
-      hireBackDbState.shiftFilter = 'OTHER';
+      hireBackDbState.shiftFilter = 'ALL';
 
       const content = document.getElementById('floatingMenuContent');
       const count = getShiftCount();
@@ -10971,14 +10971,13 @@
             />
           </div>
 
-          <!-- Shift Filter Tabs -->
+          <!-- Shift Filter Tabs (A | B | C | All) -->
           <div class="flex items-center justify-between gap-1 pt-0.5">
             <div class="flex items-center gap-1 text-[9.5px] font-bold">
-              <button type="button" id="hbTab-OTHER" onclick="setHireBackShiftFilter('OTHER')" class="px-1.5 py-0.5 rounded cursor-pointer">Other Shifts</button>
-              <button type="button" id="hbTab-B" onclick="setHireBackShiftFilter('B')" class="px-1.5 py-0.5 rounded cursor-pointer">B</button>
-              <button type="button" id="hbTab-C" onclick="setHireBackShiftFilter('C')" class="px-1.5 py-0.5 rounded cursor-pointer">C</button>
-              <button type="button" id="hbTab-A" onclick="setHireBackShiftFilter('A')" class="px-1.5 py-0.5 rounded cursor-pointer">A</button>
-              <button type="button" id="hbTab-ALL" onclick="setHireBackShiftFilter('ALL')" class="px-1.5 py-0.5 rounded cursor-pointer">All</button>
+              <button type="button" id="hbTab-A" onclick="setHireBackShiftFilter('A')" class="px-2 py-0.5 rounded cursor-pointer">A</button>
+              <button type="button" id="hbTab-B" onclick="setHireBackShiftFilter('B')" class="px-2 py-0.5 rounded cursor-pointer">B</button>
+              <button type="button" id="hbTab-C" onclick="setHireBackShiftFilter('C')" class="px-2 py-0.5 rounded cursor-pointer">C</button>
+              <button type="button" id="hbTab-ALL" onclick="setHireBackShiftFilter('ALL')" class="px-2 py-0.5 rounded cursor-pointer">All</button>
             </div>
             <span id="hireBackDbCountLabel" class="font-mono text-[9.5px] text-[var(--text-muted)]"></span>
           </div>
@@ -11009,12 +11008,12 @@
       const query = (document.getElementById('hireBackDbSearchInput')?.value || '').trim().toLowerCase();
       const filterCode = hireBackDbState.shiftFilter;
 
-      for (const code of ['OTHER', 'B', 'C', 'A', 'ALL']) {
+      for (const code of ['A', 'B', 'C', 'ALL']) {
         const btn = document.getElementById(`hbTab-${code}`);
         if (btn) {
           btn.className = code === filterCode
-            ? 'px-1.5 py-0.5 rounded bg-blue-600 text-white cursor-pointer'
-            : 'px-1.5 py-0.5 rounded bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer';
+            ? 'px-2 py-0.5 rounded bg-blue-600 text-white cursor-pointer'
+            : 'px-2 py-0.5 rounded bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer';
         }
       }
 
@@ -11039,7 +11038,6 @@
       candidates.sort((a, b) => a.pe - b.pe);
 
       const filtered = candidates.filter(o => {
-        if (filterCode === 'OTHER' && o.shift === app.selectedShift) return false;
         if ((filterCode === 'A' || filterCode === 'B' || filterCode === 'C') && o.shift !== filterCode) return false;
         if (!query) return true;
         const hay = `${o.name} ${o.pe} ${o.shift}-shift ${o.unit || ''} ${o.div || ''}`.toLowerCase();
