@@ -10737,6 +10737,7 @@
     // =========================================================================
     function positionPopoverNearEvent(event, menuHeight = 320, menuWidth = 272) {
       const menu = document.getElementById('floatingActionMenu');
+      menu.style.width = `${menuWidth}px`;
       menu.classList.remove('hidden');
       const targetEl = event?.currentTarget || event?.target || document.getElementById('sheetMinBanner');
       const rect = targetEl.getBoundingClientRect();
@@ -10929,57 +10930,161 @@
       positionPopoverNearEvent(event, 310, 268);
     }
 
-    // Minimalistic Cross-Shift Hire-Back Popover
+    // Searchable Cross-Shift Hire-Back Personnel Database Popover
+    let hireBackDbState = {
+      shiftFilter: 'OTHER', // 'OTHER' | 'ALL' | 'A' | 'B' | 'C'
+      preferredDiv: null,
+      preferredUnit: null
+    };
+
     function openHireBackPopover(event, preferredDiv = null, preferredUnit = null) {
       if (event) event.stopPropagation();
+      hireBackDbState.preferredDiv = preferredDiv;
+      hireBackDbState.preferredUnit = preferredUnit;
+      hireBackDbState.shiftFilter = 'OTHER';
+
       const content = document.getElementById('floatingMenuContent');
       const count = getShiftCount();
       const min = app.shiftMin;
       const deficit = Math.max(0, min - count);
 
-      const otherShiftOfficers = MASTER_OPERATIONS_DIRECTORY.filter(
-        o => o.shift !== app.selectedShift && o.role === 'OFFICER' && !findOfficerByPe(o.pe)?.row
-      );
-
       content.innerHTML = `
-        <div class="px-2.5 py-2 border-b border-[var(--border-grid)]">
+        <div class="px-2.5 py-2 border-b border-[var(--border-grid)] space-y-1.5">
           <div class="flex items-center justify-between">
-            <span class="font-extrabold text-[var(--text-main)]">⚡ Cross-Shift Hire-Back</span>
+            <span class="font-extrabold text-[var(--text-main)]">⚡ Hire-Back Officer Database</span>
             <span class="px-1.5 py-0.2 rounded font-mono text-[10px] font-bold ${deficit > 0 ? 'bg-red-500/20 text-red-600 dark:text-red-300' : 'bg-emerald-500/15 text-emerald-600'}">
               ${deficit > 0 ? `${deficit} Needed (${count}/${min})` : `Count ${count}/${min}`}
             </span>
           </div>
-          <div class="text-[10px] text-[var(--text-muted)] mt-0.5">
-            ${preferredUnit ? `Target Car: <strong>${preferredUnit} (${preferredDiv})</strong>` : 'Auto-assigns to open/floated car slot (PBA Art. 35)'}
+          <div class="text-[10px] text-[var(--text-muted)]">
+            ${preferredUnit ? `Target Car: <strong>${preferredUnit} (${preferredDiv})</strong>` : 'Auto-assigns to open/floated car slot (PBA Art. 35 §4)'}
+          </div>
+
+          <!-- Search Input -->
+          <div class="relative pt-0.5">
+            <input
+              id="hireBackDbSearchInput"
+              type="text"
+              placeholder="🔍 Search by Name, PE #, Shift, or Car..."
+              oninput="renderHireBackDatabaseResults()"
+              class="w-full bg-[var(--bg-subtle)] border border-[var(--border-strong)] rounded-lg px-2.5 py-1.5 text-[11px] text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <!-- Shift Filter Tabs -->
+          <div class="flex items-center justify-between gap-1 pt-0.5">
+            <div class="flex items-center gap-1 text-[9.5px] font-bold">
+              <button type="button" id="hbTab-OTHER" onclick="setHireBackShiftFilter('OTHER')" class="px-1.5 py-0.5 rounded cursor-pointer">Other Shifts</button>
+              <button type="button" id="hbTab-B" onclick="setHireBackShiftFilter('B')" class="px-1.5 py-0.5 rounded cursor-pointer">B</button>
+              <button type="button" id="hbTab-C" onclick="setHireBackShiftFilter('C')" class="px-1.5 py-0.5 rounded cursor-pointer">C</button>
+              <button type="button" id="hbTab-A" onclick="setHireBackShiftFilter('A')" class="px-1.5 py-0.5 rounded cursor-pointer">A</button>
+              <button type="button" id="hbTab-ALL" onclick="setHireBackShiftFilter('ALL')" class="px-1.5 py-0.5 rounded cursor-pointer">All</button>
+            </div>
+            <span id="hireBackDbCountLabel" class="font-mono text-[9.5px] text-[var(--text-muted)]"></span>
           </div>
         </div>
 
-        <div class="pt-1.5 space-y-1">
-          <div class="px-2.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Quick Award (Other Shifts)</div>
-          ${HIREBACK_POOL.map((h, idx) => `
-            <button onclick="closeActionPopover(); awardCrossShiftHireBack(${h.pe}, '${h.name}', '${h.shift}', ${preferredDiv ? `'${preferredDiv}'` : 'null'}, ${preferredUnit ? `'${preferredUnit}'` : 'null'})" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-500/15 flex items-center justify-between cursor-pointer">
-              <div>
-                <span class="font-bold text-[var(--text-main)]">${h.name}</span>
-                <span class="font-mono text-[10px] text-[var(--text-muted)]">#${h.pe}</span>
-              </div>
-              <span class="px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-bold text-[9.5px]">${h.shift}-Shift • +Hire</span>
-            </button>
-          `).join('')}
-        </div>
+        <!-- Scrollable Database Results -->
+        <div id="hireBackDbResultsList" class="max-h-60 overflow-y-auto divide-y divide-[var(--border-grid)] px-1 py-1"></div>
+      `;
 
-        <div class="pt-1.5 mt-1 border-t border-[var(--border-grid)] px-2 space-y-1.5">
-          <div class="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Or Pick Any B/C-Shift Officer</div>
-          <div class="flex items-center gap-1">
-            <select id="popoverCrossShiftSelect" class="flex-1 bg-[var(--bg-subtle)] border border-[var(--border-strong)] rounded-lg px-2 py-1 text-[11px] text-[var(--text-main)] focus:outline-none">
-              ${otherShiftOfficers.map(o => `<option value="${o.pe}|${o.name}|${o.shift}">[${o.shift}-Shift] ${o.name} (#${o.pe})</option>`).join('')}
-            </select>
-            <button onclick="const v=document.getElementById('popoverCrossShiftSelect').value.split('|'); closeActionPopover(); awardCrossShiftHireBack(parseInt(v[0],10), v[1], v[2], ${preferredDiv ? `'${preferredDiv}'` : 'null'}, ${preferredUnit ? `'${preferredUnit}'` : 'null'});" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] cursor-pointer shrink-0">
+      positionPopoverNearEvent(event, 360, 336);
+      renderHireBackDatabaseResults();
+      setTimeout(() => {
+        const inp = document.getElementById('hireBackDbSearchInput');
+        if (inp) inp.focus();
+      }, 20);
+    }
+
+    function setHireBackShiftFilter(filterCode) {
+      hireBackDbState.shiftFilter = filterCode;
+      renderHireBackDatabaseResults();
+    }
+
+    function renderHireBackDatabaseResults() {
+      const listEl = document.getElementById('hireBackDbResultsList');
+      const countEl = document.getElementById('hireBackDbCountLabel');
+      if (!listEl) return;
+
+      const query = (document.getElementById('hireBackDbSearchInput')?.value || '').trim().toLowerCase();
+      const filterCode = hireBackDbState.shiftFilter;
+
+      for (const code of ['OTHER', 'B', 'C', 'A', 'ALL']) {
+        const btn = document.getElementById(`hbTab-${code}`);
+        if (btn) {
+          btn.className = code === filterCode
+            ? 'px-1.5 py-0.5 rounded bg-blue-600 text-white cursor-pointer'
+            : 'px-1.5 py-0.5 rounded bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer';
+        }
+      }
+
+      // Build deduplicated list of eligible officers not currently on active patrol duty on this shift
+      const onDutyPeSet = new Set();
+      for (const div of DIV_KEYS) {
+        for (const r of (app.officers[div] || [])) {
+          if (r.name && r.pe !== null) onDutyPeSet.add(r.pe);
+        }
+      }
+
+      const seenPe = new Set();
+      const candidates = [];
+      for (const o of MASTER_OPERATIONS_DIRECTORY) {
+        if (!o.pe || onDutyPeSet.has(o.pe) || seenPe.has(o.pe)) continue;
+        if (o.role === 'COMMAND') continue;
+        seenPe.add(o.pe);
+        candidates.push(o);
+      }
+
+      // Sort by PE # ascending (Seniority order per PBA Art. 35 §4)
+      candidates.sort((a, b) => a.pe - b.pe);
+
+      const filtered = candidates.filter(o => {
+        if (filterCode === 'OTHER' && o.shift === app.selectedShift) return false;
+        if ((filterCode === 'A' || filterCode === 'B' || filterCode === 'C') && o.shift !== filterCode) return false;
+        if (!query) return true;
+        const hay = `${o.name} ${o.pe} ${o.shift}-shift ${o.unit || ''} ${o.div || ''}`.toLowerCase();
+        return hay.includes(query);
+      });
+
+      if (countEl) countEl.textContent = `${filtered.length} officers`;
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `
+          <div class="p-4 text-center text-[11px] text-[var(--text-muted)]">
+            No matching officers found. Try switching filter to <strong>All</strong> or clearing the search.
+          </div>
+        `;
+        return;
+      }
+
+      const prefDivArg = hireBackDbState.preferredDiv ? `'${hireBackDbState.preferredDiv}'` : 'null';
+      const prefUnitArg = hireBackDbState.preferredUnit ? `'${hireBackDbState.preferredUnit}'` : 'null';
+
+      listEl.innerHTML = filtered.map(o => {
+        const safeName = o.name.replace(/'/g, "\\'");
+        const unitLabel = o.unit && o.unit !== 'OFF' ? `${o.unit}${o.div ? ` (${o.div})` : ''}` : 'Off-Time';
+        return `
+          <div class="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-blue-500/10 rounded-lg transition">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="font-bold text-[var(--text-main)] truncate">${o.name}</span>
+                <span class="font-mono text-[10px] text-[var(--text-muted)] shrink-0">#${o.pe}</span>
+              </div>
+              <div class="text-[10px] text-[var(--text-muted)] font-mono">
+                <span class="px-1 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold">${o.shift}-Shift</span>
+                <span class="ml-1">${unitLabel}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onclick="closeActionPopover(); awardCrossShiftHireBack(${o.pe}, '${safeName}', '${o.shift}', ${prefDivArg}, ${prefUnitArg})"
+              class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10.5px] cursor-pointer shrink-0 shadow-2xs"
+            >
               + Assign
             </button>
           </div>
-        </div>
-      `;
-      positionPopoverNearEvent(event, 340, 288);
+        `;
+      }).join('');
     }
 
     function closeActionPopover() {
@@ -11873,16 +11978,10 @@
               </span>
               <span class="text-[9.5px] font-mono text-amber-300">Art. 35 §4</span>
             </div>
-            <div class="text-[10.5px] text-slate-200 leading-snug">
-              Cross-shift officers can claim this open Hire-Back now:
-            </div>
-            <div class="flex flex-wrap gap-1 pt-0.5">
-              ${HIREBACK_POOL.slice(0, 3).map((h, idx) => `
-                <button onclick="fillHireBackNow(${idx})" class="px-2 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[10px] cursor-pointer">
-                  ⚡ ${h.name} (#${h.pe} • ${h.shift})
-                </button>
-              `).join('')}
-            </div>
+            <button onclick="openHireBackPopover(event)" class="w-full py-1.5 px-2.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[10.5px] flex items-center justify-between cursor-pointer">
+              <span>🔍 Search Officer Database to Fill Hire-Back</span>
+              <span>▾</span>
+            </button>
           </div>
         `
         : '';
@@ -12165,14 +12264,11 @@
         hbBadge.textContent = `${needed} Hire-Back Needed`;
         hbBox.innerHTML = `
           <div class="p-2 rounded-lg bg-red-500/10 border border-red-500/30 text-xs space-y-1.5 mt-1">
-            <div class="font-bold text-red-600 dark:text-red-300 text-[11px]">Award Shift Hire-Back (Art. 35 §4):</div>
-            <div class="flex flex-wrap gap-1">
-              ${HIREBACK_POOL.map((h, idx) => `
-                <button onclick="fillHireBackNow(${idx})" class="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] cursor-pointer">
-                  + ${h.name} (#${h.pe})
-                </button>
-              `).join('')}
-            </div>
+            <div class="font-bold text-red-600 dark:text-red-300 text-[11px]">Shift Below Minimum (Art. 35 §4):</div>
+            <button onclick="openHireBackPopover(event)" class="w-full px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center justify-between cursor-pointer">
+              <span>🔍 Search Officer Database to Fill Hire-Back</span>
+              <span>▾</span>
+            </button>
           </div>
         `;
       } else {
