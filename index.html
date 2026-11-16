@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-<html class="dark" lang="en"><head><meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline' https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js; frame-src 'none'; object-src 'none'"><script>(function(){var t=window.tailwind=window.tailwind||{};if(!t.config){t.config={darkMode:'class'};}else if(t.config.darkMode!=='class'){t.config.darkMode='class';}})();document.addEventListener('DOMContentLoaded',function(){(function(){var t=window.tailwind=window.tailwind||{};if(!t.config){t.config={darkMode:'class'};}else if(t.config.darkMode!=='class'){t.config.darkMode='class';}})();});window.addEventListener('load',function(){(function(){var t=window.tailwind=window.tailwind||{};if(!t.config){t.config={darkMode:'class'};}else if(t.config.darkMode!=='class'){t.config.darkMode='class';}})();});</script></head><body class="min-h-screen p-3 md:p-5 m-0 select-none" onclick="closeActionPopover()">
-
-
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FWPD "The Books" — Modern Shift &amp; Seniority Scheduling Platform</title>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FWPD "The Books" — Modern Shift & Seniority Scheduling Platform</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -211,8 +210,8 @@
       flex-shrink: 0;
     }
   </style>
-
-
+</head>
+<body class="min-h-screen p-3 md:p-5 m-0 select-none" onclick="closeActionPopover()">
 
   <div class="max-w-[1680px] mx-auto space-y-4">
 
@@ -231,7 +230,9 @@
             <div>
               <div class="flex items-center gap-1.5">
                 <h1 class="text-sm font-bold tracking-tight text-white">The Books</h1>
-                <span id="shiftHistoryStateBadge" class="px-1.5 py-0.2 text-[9.5px] font-semibold rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">🟢 Live Schedule</span>
+                <span id="shiftHistoryStateBadge" class="px-1.5 py-0.2 text-[9.5px] font-semibold rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  Live Shift
+                </span>
               </div>
               <p class="text-[10px] text-slate-400 leading-none mt-0.5">Operations &amp; Detective Bureau • A / B / C</p>
             </div>
@@ -265,7 +266,14 @@
               ‹
             </button>
             <div class="relative flex items-center px-2">
-              <input type="date" id="scheduleDateInput" value="2026-11-15" onchange="handleDateInputChange(this.value)" class="bg-transparent text-white font-semibold text-xs focus:outline-none cursor-pointer" title="Select any current or historical date">
+              <input
+                type="date"
+                id="scheduleDateInput"
+                value="2026-11-15"
+                onchange="handleDateInputChange(this.value)"
+                class="bg-transparent text-white font-semibold text-xs focus:outline-none cursor-pointer"
+                title="Select any current or historical date"
+              />
             </div>
             <button onclick="stepDate(1)" class="w-7 h-7 rounded-lg hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center font-bold text-sm transition cursor-pointer" title="Next Day">
               ›
@@ -274,11 +282,13 @@
 
           <!-- Minimalist 3-Shift Segmented Control (A | B | C) -->
           <div class="flex items-center bg-slate-800/90 border border-slate-700 rounded-xl p-0.5 text-xs">
-            <button onclick="selectShiftCode('A')" id="shiftSeg-A" class="px-3 py-1 rounded-lg font-extrabold bg-blue-600 text-white shadow-2xs transition cursor-pointer">A-Shift</button>
-            <button onclick="selectShiftCode('B')" id="shiftSeg-B" class="px-3 py-1 rounded-lg font-semibold text-slate-400 hover:text-white transition cursor-pointer">
+            <button onclick="selectShiftCode('A')" id="shiftSeg-A" class="px-3 py-1 rounded-lg font-bold transition cursor-pointer">
+              A-Shift
+            </button>
+            <button onclick="selectShiftCode('B')" id="shiftSeg-B" class="px-3 py-1 rounded-lg font-bold transition cursor-pointer">
               B-Shift
             </button>
-            <button onclick="selectShiftCode('C')" id="shiftSeg-C" class="px-3 py-1 rounded-lg font-semibold text-slate-400 hover:text-white transition cursor-pointer">
+            <button onclick="selectShiftCode('C')" id="shiftSeg-C" class="px-3 py-1 rounded-lg font-bold transition cursor-pointer">
               C-Shift
             </button>
           </div>
@@ -289,12 +299,13 @@
           <div class="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700 rounded-xl px-2.5 py-1">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
             <span class="text-[10.5px] text-slate-400">User:</span>
-            <select id="loggedInUserSelect" onchange="handleUserSwitch()" class="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer max-w-[230px] truncate"><optgroup label="Supervisor / COD Mode (All Cars)"><option value="COD" class="text-slate-900">Supervisor / COD: LT HOPKINS, S (#1592) — All Access</option></optgroup><optgroup label="Current A-Shift Active Roster"><option value="1995" class="text-slate-900">WENZEL, J (#1995) — B112 [NW]</option><option value="1964" class="text-slate-900">CRALL, A (#1964) — B114 [NW]</option><option value="1710" class="text-slate-900">KENEMORE, D (#1710) — C117 [NW]</option><option value="1986" class="text-slate-900">VOHS, B (#1986) — C118 [NW]</option><option value="1881" class="text-slate-900">JURICAK, B (#1881) — A119 [NW]</option><option value="1890" class="text-slate-900">CLARK, T (#1890) — B132 [NW]</option><option value="1797" class="text-slate-900">MILLER, B (#1797) — C136 [NW]</option><option value="1817" class="text-slate-900">SQUIRES, C (#1817) — A137 [NW]</option><option value="2078" class="text-slate-900">SIKORSKI, D (#2078) — F212 [NE]</option><option value="1910" class="text-slate-900">HILL, K (#1910) — F215 [NE]</option><option value="1834" class="text-slate-900">JOHNSON, J (#1834) — G216 [NE]</option><option value="1926" class="text-slate-900">BUCHS, J (#1926) — E217 [NE]</option><option value="1968" class="text-slate-900">BITTNER, M (#1968) — E231 [NE]</option><option value="1957" class="text-slate-900">WAIDELICH, T (#1957) — G234 [NE]</option><option value="1977" class="text-slate-900">McGILL, M (#1977) — F236 [NE]</option><option value="1847" class="text-slate-900">SLOAN, B (#1847) — E238 [NE]</option><option value="1976" class="text-slate-900">KROCK, A (#1976) — J313 [SW]</option><option value="2077" class="text-slate-900">SHIFFLETT, J (#2077) — I314 [SW]</option><option value="1538" class="text-slate-900">VACHON, T (#1538) — L317 [SW]</option><option value="1845" class="text-slate-900">SAVAGE, JR., W (#1845) — K318 [SW]</option><option value="1965" class="text-slate-900">GUZMAN, M (#1965) — J331 [SW]</option><option value="1962" class="text-slate-900">BELDON, J (#1962) — J333 [SW]</option><option value="1804" class="text-slate-900">TRENARY, J (#1804) — K335 [SW]</option><option value="2072" class="text-slate-900">PETERS, D (#2072) — I336 [SW]</option><option value="1886" class="text-slate-900">CARRIER, S (#1886) — L337 [SW]</option><option value="1952" class="text-slate-900">SHELLEY, J (#1952) — D11 [SE]</option><option value="2064" class="text-slate-900">JONES, N (#2064) — D12 [SE]</option><option value="2042" class="text-slate-900">BRYANT, B (#2042) — N411 [SE]</option><option value="1982" class="text-slate-900">DURNELL, S (#1982) — O416 [SE]</option><option value="1883" class="text-slate-900">MAURER, A (#1883) — M419 [SE]</option><option value="2045" class="text-slate-900">PASCUAL, M (#2045) — O431 [SE]</option><option value="2024" class="text-slate-900">YODER, J (#2024) — N437 [SE]</option></optgroup><optgroup label="Switch to B-Shift Officer"><option value="JUMP_B_11_16_1997" class="text-slate-900">[B-Shift] AGUILERA, A (#1997) — D41</option><option value="JUMP_B_11_16_1990" class="text-slate-900">[B-Shift] ALIG, M (#1990) — N446</option><option value="JUMP_B_11_16_1827" class="text-slate-900">[B-Shift] BUSH, D (#1827) — E252</option><option value="JUMP_B_11_16_2086" class="text-slate-900">[B-Shift] CARROLL, C (#2086) — B154</option><option value="JUMP_B_11_16_2087" class="text-slate-900">[B-Shift] CHRISTIAN, T (#2087) — K344</option><option value="JUMP_B_11_16_2141" class="text-slate-900">[B-Shift] CLAIR, K (#2141) — O456</option><option value="JUMP_B_11_16_2097" class="text-slate-900">[B-Shift] DAVIS, L (#2097) — C148</option><option value="JUMP_B_11_16_2144" class="text-slate-900">[B-Shift] DEMATO, R (#2144) — B142</option><option value="JUMP_B_11_16_2145" class="text-slate-900">[B-Shift] DULY, M (#2145) — N447</option><option value="JUMP_B_11_16_2126" class="text-slate-900">[B-Shift] ELLINGTON, R (#2126) — C158</option><option value="JUMP_B_11_16_2146" class="text-slate-900">[B-Shift] FRIEDT, I (#2146) — B144</option><option value="JUMP_B_11_16_2119" class="text-slate-900">[B-Shift] FRIES, M (#2119) — G258</option><option value="JUMP_B_11_16_2127" class="text-slate-900">[B-Shift] GYNN, C (#2127) — F255</option><option value="JUMP_B_11_16_2147" class="text-slate-900">[B-Shift] HACKBARTH, D (#2147) — J341</option><option value="JUMP_B_11_16_2151" class="text-slate-900">[B-Shift] HTOO, R (#2151) — G249</option><option value="JUMP_B_11_16_2100" class="text-slate-900">[B-Shift] JARRETT, Y (#2100) — I352</option><option value="JUMP_B_11_16_2131" class="text-slate-900">[B-Shift] LONG, M (#2131) — A149</option><option value="JUMP_B_11_16_2116" class="text-slate-900">[B-Shift] METZGER, N (#2116) — F244</option><option value="JUMP_B_11_16_2135" class="text-slate-900">[B-Shift] MUMBOWER, J (#2135) — M443</option><option value="JUMP_B_11_16_2154" class="text-slate-900">[B-Shift] MYERS, C (#2154) — M452</option><option value="JUMP_B_11_16_2106" class="text-slate-900">[B-Shift] ODLE, J (#2106) — E257</option><option value="JUMP_B_11_16_2155" class="text-slate-900">[B-Shift] OLRY, C (#2155) — N445</option><option value="JUMP_B_11_16_2156" class="text-slate-900">[B-Shift] PAULY, L (#2156) — N448</option><option value="JUMP_B_11_16_2088" class="text-slate-900">[B-Shift] PEPPLER, N (#2088) — C145</option><option value="JUMP_B_11_16_1981" class="text-slate-900">[B-Shift] PLANK, N (#1981) — 834</option><option value="JUMP_B_11_16_2091" class="text-slate-900">[B-Shift] PORTER, M (#2091) — F241</option><option value="JUMP_B_11_16_2157" class="text-slate-900">[B-Shift] PRUSER, B (#2157) — M444</option><option value="JUMP_B_11_16_2120" class="text-slate-900">[B-Shift] ROBINSON, D (#2120) — 862</option><option value="JUMP_B_11_16_1746" class="text-slate-900">[B-Shift] SCHULIEN, S (#1746) — L354</option><option value="JUMP_B_11_16_2163" class="text-slate-900">[B-Shift] STEVENS, C (#2163) — J355</option><option value="JUMP_B_11_16_2079" class="text-slate-900">[B-Shift] STREET, M (#2079) — B157</option><option value="JUMP_B_11_16_2138" class="text-slate-900">[B-Shift] STUCK, N (#2138) — A151</option><option value="JUMP_B_11_16_2164" class="text-slate-900">[B-Shift] TAYLOR, Z (#2164) — M442</option><option value="JUMP_B_11_16_2165" class="text-slate-900">[B-Shift] URBAN, T (#2165) — K356</option><option value="JUMP_B_11_16_2112" class="text-slate-900">[B-Shift] VILLAGOMEZ, H (#2112) — I343</option><option value="JUMP_B_11_16_2083" class="text-slate-900">[B-Shift] WESSLEY, B (#2083) — J359</option><option value="JUMP_B_11_16_2005" class="text-slate-900">[B-Shift] WILLIAMS, N (#2005) — C153</option><option value="JUMP_B_11_16_2167" class="text-slate-900">[B-Shift] WYATT, S (#2167) — D52</option></optgroup><optgroup label="Switch to C-Shift Officer"><option value="JUMP_C_11_15_2006" class="text-slate-900">[C-Shift] ALEXANDER, J (#2006) — B191</option><option value="JUMP_C_11_15_2092" class="text-slate-900">[C-Shift] BAKER, J (#2092) — I392</option><option value="JUMP_C_11_15_1961" class="text-slate-900">[C-Shift] BEAVER, S (#1961) — K9-12</option><option value="JUMP_C_11_15_1935" class="text-slate-900">[C-Shift] BEER, B (#1935) — C195</option><option value="JUMP_C_11_15_1936" class="text-slate-900">[C-Shift] BODEKER, M (#1936) — N477</option><option value="JUMP_C_11_15_2094" class="text-slate-900">[C-Shift] CAMPO, B (#2094) — K372</option><option value="JUMP_C_11_15_1972" class="text-slate-900">[C-Shift] DIAZ, M (#1972) — M493</option><option value="JUMP_C_11_15_1939" class="text-slate-900">[C-Shift] DUBBERLY, B (#1939) — M496</option><option value="JUMP_C_11_15_1689" class="text-slate-900">[C-Shift] FAIRCHILD, C (#1689) — A196</option><option value="JUMP_C_11_15_1974" class="text-slate-900">[C-Shift] FRETZ, J (#1974) — J394</option><option value="JUMP_C_11_15_2058" class="text-slate-900">[C-Shift] GARLAND, T (#2058) — F276</option><option value="JUMP_C_11_15_2028" class="text-slate-900">[C-Shift] GEORGE, K (#2028) — G279</option><option value="JUMP_C_11_15_2059" class="text-slate-900">[C-Shift] GERNHARDT, J (#2059) — F274</option><option value="JUMP_C_11_15_1942" class="text-slate-900">[C-Shift] HARRIS, K (#1942) — G294</option><option value="JUMP_C_11_15_1733" class="text-slate-900">[C-Shift] HOLMES, J (#1733) — L393</option><option value="JUMP_C_11_15_1975" class="text-slate-900">[C-Shift] INNIS, M (#1975) — J396</option><option value="JUMP_C_11_15_1913" class="text-slate-900">[C-Shift] JACKSON, S (#1913) — K9-8</option><option value="JUMP_C_11_15_2090" class="text-slate-900">[C-Shift] KNEUBUHLER, A (#2090) — D92</option><option value="JUMP_C_11_15_2013" class="text-slate-900">[C-Shift] LAMBIASE, B (#2013) — C171</option><option value="JUMP_C_11_15_2101" class="text-slate-900">[C-Shift] LECORCHICK, J (#2101) — F295</option><option value="JUMP_C_11_15_1916" class="text-slate-900">[C-Shift] LEMISH, J (#1916) — B179</option><option value="JUMP_C_11_15_1967" class="text-slate-900">[C-Shift] LENGERICH, J (#1967) — N492</option><option value="JUMP_C_11_15_1992" class="text-slate-900">[C-Shift] LICHTSINN, N (#1992) — N472</option><option value="JUMP_C_11_15_2102" class="text-slate-900">[C-Shift] MATTESON, R (#2102) — D71</option><option value="JUMP_C_11_15_1979" class="text-slate-900">[C-Shift] MUELLER, N (#1979) — E278</option><option value="JUMP_C_11_15_1980" class="text-slate-900">[C-Shift] PATTERSON, E (#1980) — E293</option><option value="JUMP_C_11_15_2118" class="text-slate-900">[C-Shift] PEASE, B (#2118) — L391</option><option value="JUMP_C_11_15_2035" class="text-slate-900">[C-Shift] POEPPEL, M (#2035) — K9-3</option><option value="JUMP_C_11_15_1860" class="text-slate-900">[C-Shift] SANDERS, G (#1860) — K399</option><option value="JUMP_C_11_15_1951" class="text-slate-900">[C-Shift] SAXTON, J (#1951) — C175</option><option value="JUMP_C_11_15_2039" class="text-slate-900">[C-Shift] SHOTZMAN, A (#2039) — I379</option><option value="JUMP_C_11_15_1901" class="text-slate-900">[C-Shift] SMITH, R (#1901) — O499</option><option value="JUMP_C_11_15_2110" class="text-slate-900">[C-Shift] TAYLOR, I (#2110) — O495</option><option value="JUMP_C_11_15_1924" class="text-slate-900">[C-Shift] TOSLAND, R (#1924) — C193</option><option value="JUMP_C_11_15_2021" class="text-slate-900">[C-Shift] VALENCIA, I (#2021) — A173</option><option value="JUMP_C_11_15_1989" class="text-slate-900">[C-Shift] WYSS, I (#1989) — J374</option></optgroup></select>
+            <select id="loggedInUserSelect" onchange="handleUserSwitch()" class="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer max-w-[230px] truncate">
+            </select>
           </div>
 
           <div class="hidden md:flex items-center gap-1 bg-slate-800/90 border border-slate-700 rounded-xl px-2 py-1 text-xs">
             <select id="floatScopeSelect" onchange="recalculateFloats()" class="bg-transparent text-slate-200 font-medium text-[11px] focus:outline-none cursor-pointer" title="Float Scope Rule">
-              <option value="citywide" selected="" class="text-slate-900">Float: Citywide PE#</option>
+              <option value="citywide" selected class="text-slate-900">Float: Citywide PE#</option>
               <option value="quadrant" class="text-slate-900">Float: Quadrant First</option>
             </select>
           </div>
@@ -307,7 +318,9 @@
             ↺ Reset
           </button>
 
-          
+          <button id="publishHelperBtn" onclick="openPublishModalAndCopy()" class="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/40 transition cursor-pointer">
+            🚀 Copy HTML
+          </button>
         </div>
 
       </div>
@@ -335,8 +348,8 @@
 
             <!-- Left: Status Pill (MINIMUM COUNT / ABOVE / BELOW) + Quick Demo Min Control -->
             <div class="flex flex-wrap items-center gap-2.5">
-              <div id="sheetMinBanner" class="px-3.5 py-1.5 rounded-lg font-extrabold text-xs tracking-wider uppercase flex items-center gap-2 bg-amber-400 text-slate-950 border border-amber-500 shadow-xs">
-                <span id="sheetMinDot" class="w-2 h-2 rounded-full bg-slate-950"></span>
+              <div id="sheetMinBanner" class="px-3.5 py-1.5 rounded-lg font-extrabold text-xs tracking-wider uppercase flex items-center gap-2 shadow-xs">
+                <span id="sheetMinDot" class="w-2 h-2 rounded-full"></span>
                 <span id="sheetMinText">MINIMUM COUNT</span>
               </div>
 
@@ -356,7 +369,9 @@
               <div class="text-xs font-extrabold tracking-widest uppercase text-[var(--text-muted)]">
                 FORT WAYNE POLICE DEPARTMENT
               </div>
-              <div id="paperScheduleHeadline" class="text-sm md:text-base font-extrabold tracking-tight text-[var(--text-main)]">A-SHIFT WORK SCHEDULE • <span class="font-semibold">Sunday, November 15, 2026</span></div>
+              <div id="paperScheduleHeadline" class="text-sm md:text-base font-extrabold tracking-tight text-[var(--text-main)]">
+                A-SHIFT WORK SCHEDULE • <span class="font-semibold">Sunday, November 15, 2026</span>
+              </div>
               <div id="paperGuardDutyBanner" class="hidden mt-1 inline-block px-2.5 py-0.5 rounded bg-amber-300 text-slate-950 font-extrabold text-[11px] border border-amber-500 shadow-2xs"></div>
             </div>
 
@@ -383,21 +398,21 @@
               <table class="books-table">
                 <colgroup>
                   <!-- NW -->
-                  <col style="width: 4.3%;">
-                  <col style="width: 15.2%;">
-                  <col style="width: 5.5%;">
+                  <col style="width: 4.3%;" />
+                  <col style="width: 15.2%;" />
+                  <col style="width: 5.5%;" />
                   <!-- NE -->
-                  <col style="width: 4.3%;">
-                  <col style="width: 15.2%;">
-                  <col style="width: 5.5%;">
+                  <col style="width: 4.3%;" />
+                  <col style="width: 15.2%;" />
+                  <col style="width: 5.5%;" />
                   <!-- SW -->
-                  <col style="width: 4.3%;">
-                  <col style="width: 15.2%;">
-                  <col style="width: 5.5%;">
+                  <col style="width: 4.3%;" />
+                  <col style="width: 15.2%;" />
+                  <col style="width: 5.5%;" />
                   <!-- SE -->
-                  <col style="width: 4.3%;">
-                  <col style="width: 15.2%;">
-                  <col style="width: 5.5%;">
+                  <col style="width: 4.3%;" />
+                  <col style="width: 15.2%;" />
+                  <col style="width: 5.5%;" />
                 </colgroup>
 
                 <!-- DIVISION HEADER BARS -->
@@ -445,156 +460,7 @@
                 </thead>
 
                 <!-- COMMAND ROWS -->
-                <tbody id="paperCommandBody"><tr>
-            <td class="unit-cell ">721</td>
-            <td class=""><div class="flex items-center justify-between">
-                 <span class="font-medium">LT HOPKINS, S</span>
-                 <span class="font-mono text-[10px] text-[var(--text-muted)]">(1592)</span>
-               </div></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">722</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">723</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell "></td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell "></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell "></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell "></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">830</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell ">110</td>
-            <td class=""><div class="flex items-center justify-between">
-                 <span class="font-medium">SGT BRAUTZSCH, C</span>
-                 <span class="font-mono text-[10px] text-[var(--text-muted)]">(1877)</span>
-               </div></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">210</td>
-            <td class=""><div class="flex items-center justify-between">
-                 <span class="font-medium">SGT MILLER, B</span>
-                 <span class="font-mono text-[10px] text-[var(--text-muted)]">(1695)</span>
-               </div></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">310</td>
-            <td class=""><div class="flex items-center justify-between">
-                 <span class="font-medium">SGT KREIGER, J</span>
-                 <span class="font-mono text-[10px] text-[var(--text-muted)]">(1634)</span>
-               </div></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">410</td>
-            <td class=""><div class="flex items-center justify-between">
-                 <span class="font-medium">SGT CUTLER, J</span>
-                 <span class="font-mono text-[10px] text-[var(--text-muted)]">(1727)</span>
-               </div></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell ">120</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">220</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">320</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">420</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell ">130</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">230</td>
-            <td class=""><div class="flex items-center justify-between">
-                 <span class="font-medium">SGT HOLMES, T</span>
-                 <span class="font-mono text-[10px] text-[var(--text-muted)]">(1557)</span>
-               </div></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">330</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">430</td>
-            <td class=""><div class="flex items-center justify-between">
-                 <span class="font-bold">SGT WOLFE, I</span>
-                 <span class="font-mono text-[10px] text-[var(--text-muted)]">(1851)</span>
-               </div></td>
-            <td class="text-center  "><span class="px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-600 dark:text-blue-300 font-mono font-bold text-[10px]">88 0930</span></td>
-          </tr><tr>
-            <td class="unit-cell ">102</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">202</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">302</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">402</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell ">103</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">203</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">303</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell ">403</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell "></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell "></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell "></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell "></td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr></tbody>
+                <tbody id="paperCommandBody"></tbody>
 
                 <!-- OFFICERS SUB-HEADER -->
                 <thead>
@@ -615,887 +481,7 @@
                 </thead>
 
                 <!-- OFFICER ROWS -->
-                <tbody id="paperOfficersBody"><tr>
-            <td class="unit-cell" title="A111">A111</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="F211">F211</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="K311">K311</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">D11</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">SHELLEY, J</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1952)</span>
-                  <span class="text-[10px] text-[var(--text-muted)] ml-1">/ GARZA, A (2174)</span>
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="B112">B112</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">WENZEL, J</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1995)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="F212">F212</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">SIKORSKI, D</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(2078)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="J312">J312</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="D12">D12</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">JONES, N</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(2064)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="C113">C113</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="G213">G213</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">J313</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">KROCK, A</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1976)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="N411">N411</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">BRYANT, B</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(2042)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="B114">B114</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">CRALL, A</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1964)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="F214">F214</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="I314">I314</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">SHIFFLETT, J</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(2077)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">N412</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="B115">B115</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="F215">F215</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">HILL, K</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1910)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="I315">I315</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="M413">M413</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="C116">C116</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="G216">G216</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">JOHNSON, J</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1834)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="J316">J316</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="M414">M414</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">C117</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">KENEMORE, D</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1710)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="E217">E217</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">BUCHS, J</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1926)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">L317</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">VACHON, T</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1538)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="N415">N415</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="C118">C118</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">VOHS, B</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1986)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="E218">E218</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">K318</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">SAVAGE, JR., W</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1845)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">O416</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">DURNELL, S</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1982)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="A119">A119</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">JURICAK, B</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1881)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="E219">E219</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="K319">K319</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="O417">O417</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="C121">C121</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="E221">E221</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="J321">J321</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="O418">O418</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="A122">A122</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="E222">E222</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="J322">J322</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="M419">M419</td>
-            <td class="row-logged-in">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-bold">MAURER, A</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1883)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  <button type="button" onclick="openOfficerActionPopover(event, 'ON_DUTY', 'SE', 'M419')" class="caret-btn" title="Actions for MAURER, A (#1883)">▾</button>
-                </div>
-              </div>
-            </td>
-            <td class="text-center row-logged-in "></td>
-          </tr><tr>
-            <td class="unit-cell" title="C123">C123</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">F223</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="I323">I323</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="D21">D21</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="A124">A124</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">F224</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">I324</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="D22">D22</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="B125">B125</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="F225">F225</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="K325">K325</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="O421">O421</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="C126">C126</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="E226">E226</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="K326">K326</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="N422">N422</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="B127">B127</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">G227</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="L327">L327</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="M423">M423</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">B128</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="E228">E228</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="J328">J328</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="M424">M424</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="C129">C129</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="G229">G229</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="L329">L329</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="N425">N425</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="C131">C131</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="E231">E231</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-bold">BITTNER, M</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1968)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"><span class="px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-600 dark:text-blue-300 font-mono font-bold text-[10px]">88 1000</span></td>
-          
-            <td class="unit-cell" title="J331">J331</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">GUZMAN, M</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1965)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="M426">M426</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="B132">B132</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">CLARK, T</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1890)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="F232">F232</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="I332">I332</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="O427">O427</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="B133">B133</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="F233">F233</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="J333">J333</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">BELDON, J</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1962)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="N428">N428</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="C134">C134</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="G234">G234</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">WAIDELICH, T</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1957)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="J334">J334</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="M429">M429</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="C135">C135</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="E235">E235</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="K335">K335</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">TRENARY, J</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1804)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="D31">D31</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="C136">C136</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">MILLER, B</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1797)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="F236">F236</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">McGILL, M</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1977)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="I336">I336</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">PETERS, D</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(2072)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="D32">D32</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">A137</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">SQUIRES, C</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1817)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="F237">F237</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="L337">L337</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">CARRIER, S</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1886)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="O431">O431</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">PASCUAL, M</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(2045)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="B138">B138</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="E238">E238</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">SLOAN, B</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(1847)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="L338">L338</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="N432">N432</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title="K9-5">K9-5</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="K9-14">K9-14</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="K9-7">K9-7</td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell unit-bid-car" title="Standing Union Bid Car — Protected from Floating">M433</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title=""></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title=""></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title=""></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="M434">M434</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title=""></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title=""></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title=""></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="M435">M435</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title=""></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title=""></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title=""></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="N436">N436</td>
-            <td class=""></td>
-            <td class="text-center  "></td>
-          </tr><tr>
-            <td class="unit-cell" title=""></td>
-            <td class=""><span class="text-[10px] text-[var(--text-faint)] font-mono">11/14/2026</span></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title=""></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title=""></td>
-            <td class=""></td>
-            <td class="text-center  div-sep-right"></td>
-          
-            <td class="unit-cell" title="N437">N437</td>
-            <td class="">
-              <div class="flex items-center justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-medium">YODER, J</span>
-                  <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(2024)</span>
-                  
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  
-                  
-                </div>
-              </div>
-            </td>
-            <td class="text-center  "></td>
-          </tr></tbody>
+                <tbody id="paperOfficersBody"></tbody>
 
                 <!-- DAY OFF / LEAVE ROSTER SECTION -->
                 <thead>
@@ -1522,46 +508,14 @@
                     <th class="col-sub-cell">STATUS</th>
                   </tr>
                 </thead>
-                <tbody id="paperDayOffBody"><tr>
-              <td class="unit-cell opacity-40">—</td>
-              <td class="text-[var(--text-faint)] text-[11px] italic">None marked off</td>
-              <td class="div-sep-right"></td>
-            
-              <td class="unit-cell opacity-40">—</td>
-              <td class="text-[var(--text-faint)] text-[11px] italic">None marked off</td>
-              <td class="div-sep-right"></td>
-            
-              <td class="unit-cell opacity-40">—</td>
-              <td class="text-[var(--text-faint)] text-[11px] italic">None marked off</td>
-              <td class="div-sep-right"></td>
-            
-              <td class="unit-cell opacity-40">—</td>
-              <td class="text-[var(--text-faint)] text-[11px] italic">None marked off</td>
-              <td class=""></td>
-            </tr><tr>
-              <td class="unit-cell opacity-40">—</td>
-              <td class="text-[var(--text-faint)] text-[11px] italic"></td>
-              <td class="div-sep-right"></td>
-            
-              <td class="unit-cell opacity-40">—</td>
-              <td class="text-[var(--text-faint)] text-[11px] italic"></td>
-              <td class="div-sep-right"></td>
-            
-              <td class="unit-cell opacity-40">—</td>
-              <td class="text-[var(--text-faint)] text-[11px] italic"></td>
-              <td class="div-sep-right"></td>
-            
-              <td class="unit-cell opacity-40">—</td>
-              <td class="text-[var(--text-faint)] text-[11px] italic"></td>
-              <td class=""></td>
-            </tr></tbody>
+                <tbody id="paperDayOffBody"></tbody>
 
                 <!-- SCHEDULED SHIFT OFF-TIME & SPECIAL ASSIGNMENT SHEET (From Official Shift Book) -->
                 <thead>
                   <tr>
                     <th colspan="12" class="bg-slate-900 text-white font-bold text-left px-3 py-1.5 text-[11px] tracking-wider uppercase border-t-2 border-slate-700">
                       <div class="flex items-center justify-between">
-                        <span id="scheduledOffTimeTitle">A-SHIFT OFF TIME &amp; SPECIAL ASSIGNMENTS (SUNDAY, NOVEMBER 15, 2026)</span>
+                        <span id="scheduledOffTimeTitle">SCHEDULED SHIFT OFF-TIME &amp; SPECIAL ASSIGNMENTS (REGULAR DAY OFF / VACATION / SICK / TRAINING)</span>
                         <span class="text-[10px] font-normal text-slate-400">Official Shift Off-Time Roster</span>
                       </div>
                     </th>
@@ -1573,91 +527,7 @@
                     <th colspan="3" class="col-sub-cell !bg-amber-400/20 !text-amber-900 dark:!text-amber-300">TRAINING / ADMIN / EXCH / SPECIAL</th>
                   </tr>
                 </thead>
-                <tbody id="paperScheduledOffTimeBody">
-          <tr>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-[var(--text-main)]">NICKLOW, G (1777)</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-blue-700 dark:text-blue-300">CHILDS, M (1970) 8.5 hrs [PREF VAC]</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-red-700 dark:text-red-300">GEISLEMAN, Z (1879) 8 hrs [LIGHT DUTY - HOD]</td>
-            <td colspan="3" class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300">WOODS, G (1720) [TRN]</td>
-          </tr>
-        
-          <tr>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-[var(--text-main)]">BROWN, T (1783)</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-blue-700 dark:text-blue-300">ENGELMAN, D (1586) 8.5 hrs [VAC]</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-red-700 dark:text-red-300">BRIGHT, S (2051) 8.5 hrs [MILITARY NO-PAY]</td>
-            <td colspan="3" class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300">HUGHES, T (1716) [HDU]</td>
-          </tr>
-        
-          <tr>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-[var(--text-main)]">FARRELL, T (1588)</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-blue-700 dark:text-blue-300"></td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-red-700 dark:text-red-300"></td>
-            <td colspan="3" class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300">WAIDELICH II, T (2004) [ASU]</td>
-          </tr>
-        
-          <tr>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-[var(--text-main)]">SNYDER, J (1602)</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-blue-700 dark:text-blue-300"></td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-red-700 dark:text-red-300"></td>
-            <td colspan="3" class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300"></td>
-          </tr>
-        
-          <tr>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-[var(--text-main)]">AGUILAR, M (1873)</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-blue-700 dark:text-blue-300"></td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-red-700 dark:text-red-300"></td>
-            <td colspan="3" class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300"></td>
-          </tr>
-        
-          <tr>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-[var(--text-main)]">HUTSON, D (1874)</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-blue-700 dark:text-blue-300"></td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-red-700 dark:text-red-300"></td>
-            <td colspan="3" class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300"></td>
-          </tr>
-        
-          <tr>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-[var(--text-main)]">STUDEBAKER, S (1699)</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-blue-700 dark:text-blue-300"></td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-red-700 dark:text-red-300"></td>
-            <td colspan="3" class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300"></td>
-          </tr>
-        
-          <tr>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-[var(--text-main)]">GEARHART, M (1878)</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-blue-700 dark:text-blue-300"></td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-red-700 dark:text-red-300"></td>
-            <td colspan="3" class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300"></td>
-          </tr>
-        
-          <tr>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-[var(--text-main)]">SIERKS, M (1679)</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-blue-700 dark:text-blue-300"></td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-red-700 dark:text-red-300"></td>
-            <td colspan="3" class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300"></td>
-          </tr>
-        
-          <tr>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-[var(--text-main)]">RABER, D (1885)</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-blue-700 dark:text-blue-300"></td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-red-700 dark:text-red-300"></td>
-            <td colspan="3" class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300"></td>
-          </tr>
-        
-          <tr>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-[var(--text-main)]">HOCHSTETLER, D (1911)</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-blue-700 dark:text-blue-300"></td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-red-700 dark:text-red-300"></td>
-            <td colspan="3" class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300"></td>
-          </tr>
-        
-          <tr>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-[var(--text-main)]">BARRIENTES, T (1904)</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-blue-700 dark:text-blue-300"></td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-red-700 dark:text-red-300"></td>
-            <td colspan="3" class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300"></td>
-          </tr>
-        </tbody>
+                <tbody id="paperScheduledOffTimeBody"></tbody>
               </table>
             </div>
           </div>
@@ -1697,359 +567,7 @@
                 Highest PE# First
               </span>
             </div>
-            <div id="floatQueueMiniList" class="space-y-1 max-h-44 overflow-y-auto pr-1 text-xs font-mono">
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #1
-            </span>
-            <span class="font-bold truncate">SIKORSKI, D (2078)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[F212]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #2
-            </span>
-            <span class="font-bold truncate">SHIFFLETT, J (2077)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[I314]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #3
-            </span>
-            <span class="font-bold truncate">PETERS, D (2072)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[I336]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #4
-            </span>
-            <span class="font-bold truncate">JONES, N (2064)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[D12]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #5
-            </span>
-            <span class="font-bold truncate">PASCUAL, M (2045)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[O431]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #6
-            </span>
-            <span class="font-bold truncate">BRYANT, B (2042)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[N411]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #7
-            </span>
-            <span class="font-bold truncate">YODER, J (2024)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[N437]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #8
-            </span>
-            <span class="font-bold truncate">WENZEL, J (1995)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[B112]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #9
-            </span>
-            <span class="font-bold truncate">VOHS, B (1986)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[C118]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #10
-            </span>
-            <span class="font-bold truncate">McGILL, M (1977)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[F236]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #11
-            </span>
-            <span class="font-bold truncate">BITTNER, M (1968)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[E231]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #12
-            </span>
-            <span class="font-bold truncate">GUZMAN, M (1965)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[J331]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #13
-            </span>
-            <span class="font-bold truncate">CRALL, A (1964)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[B114]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #14
-            </span>
-            <span class="font-bold truncate">BELDON, J (1962)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[J333]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #15
-            </span>
-            <span class="font-bold truncate">WAIDELICH, T (1957)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[G234]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #16
-            </span>
-            <span class="font-bold truncate">BUCHS, J (1926)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[E217]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #17
-            </span>
-            <span class="font-bold truncate">HILL, K (1910)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[F215]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #18
-            </span>
-            <span class="font-bold truncate">CLARK, T (1890)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[B132]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #19
-            </span>
-            <span class="font-bold truncate">CARRIER, S (1886)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[L337]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #20
-            </span>
-            <span class="font-bold truncate">JURICAK, B (1881)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[A119]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #21
-            </span>
-            <span class="font-bold truncate">SLOAN, B (1847)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[E238]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #22
-            </span>
-            <span class="font-bold truncate">JOHNSON, J (1834)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[G216]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #23
-            </span>
-            <span class="font-bold truncate">TRENARY, J (1804)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[K335]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300">
-              #24
-            </span>
-            <span class="font-bold truncate">MILLER, B (1797)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[C136]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">⚡ Eligible</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] opacity-55">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-500/15 text-[var(--text-muted)]">
-              LOCK
-            </span>
-            <span class="font-bold truncate">DURNELL, S (1982)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[O416]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">🔒 Bid Car</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] opacity-55">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-500/15 text-[var(--text-muted)]">
-              LOCK
-            </span>
-            <span class="font-bold truncate">KROCK, A (1976)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[J313]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">🔒 Bid Car</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] opacity-55">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-500/15 text-[var(--text-muted)]">
-              LOCK
-            </span>
-            <span class="font-bold truncate">SHELLEY, J (1952)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[D11]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">🔒 Bid Car</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] opacity-55">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-500/15 text-[var(--text-muted)]">
-              LOCK
-            </span>
-            <span class="font-bold truncate">MAURER, A (1883)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[M419]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">🛡️ Sole in M</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] opacity-55">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-500/15 text-[var(--text-muted)]">
-              LOCK
-            </span>
-            <span class="font-bold truncate">SAVAGE, JR., W (1845)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[K318]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">🔒 Bid Car</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] opacity-55">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-500/15 text-[var(--text-muted)]">
-              LOCK
-            </span>
-            <span class="font-bold truncate">SQUIRES, C (1817)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[A137]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">🔒 Bid Car</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] opacity-55">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-500/15 text-[var(--text-muted)]">
-              LOCK
-            </span>
-            <span class="font-bold truncate">KENEMORE, D (1710)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[C117]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">🔒 Bid Car</span>
-        </div>
-      
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] opacity-55">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-500/15 text-[var(--text-muted)]">
-              LOCK
-            </span>
-            <span class="font-bold truncate">VACHON, T (1538)</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[L317]</span>
-          </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">🔒 Bid Car</span>
-        </div>
-      </div>
+            <div id="floatQueueMiniList" class="space-y-1 max-h-44 overflow-y-auto pr-1 text-xs font-mono"></div>
           </div>
 
           <!-- Card 2: District Coverage & Hire-Backs -->
@@ -2058,9 +576,9 @@
               <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
                 Districts (A–O) &amp; Hire-Backs (Art. 35)
               </span>
-              <span id="hireBackCountBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">Count OK (32/32)</span>
+              <span id="hireBackCountBadge" class="px-2 py-0.5 rounded text-[10px] font-bold"></span>
             </div>
-            <div id="districtCoverageMiniGrid" class="grid grid-cols-4 gap-1 text-[11px] font-mono"><div class="px-1.5 py-1 rounded border text-center bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">A: <strong>2</strong></div><div class="px-1.5 py-1 rounded border text-center bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">B: <strong>3</strong></div><div class="px-1.5 py-1 rounded border text-center bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">C: <strong>3</strong></div><div class="px-1.5 py-1 rounded border text-center bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">E: <strong>3</strong></div><div class="px-1.5 py-1 rounded border text-center bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">F: <strong>3</strong></div><div class="px-1.5 py-1 rounded border text-center bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">G: <strong>2</strong></div><div class="px-1.5 py-1 rounded border text-center bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">I: <strong>2</strong></div><div class="px-1.5 py-1 rounded border text-center bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">J: <strong>3</strong></div><div class="px-1.5 py-1 rounded border text-center bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">K: <strong>2</strong></div><div class="px-1.5 py-1 rounded border text-center bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">L: <strong>2</strong></div><div class="px-1.5 py-1 rounded border text-center bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">D: <strong>2</strong></div><div class="px-1.5 py-1 rounded border text-center bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300">M: <strong>1</strong></div><div class="px-1.5 py-1 rounded border text-center bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">N: <strong>2</strong></div><div class="px-1.5 py-1 rounded border text-center bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">O: <strong>2</strong></div></div>
+            <div id="districtCoverageMiniGrid" class="grid grid-cols-4 gap-1 text-[11px] font-mono"></div>
             <div id="hireBackActionBox" class="pt-1"></div>
           </div>
 
@@ -2072,15 +590,7 @@
               </span>
               <span class="text-[10px] text-[var(--text-muted)]">Real-Time Log</span>
             </div>
-            <div id="auditMiniList" class="space-y-1.5 max-h-44 overflow-y-auto pr-1 text-xs">
-        <div class="p-2 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] space-y-0.5">
-          <div class="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-mono">
-            <span>06:00</span>
-            <span class="px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-600 dark:text-blue-300 font-semibold">Art. 34 &amp; 37</span>
-          </div>
-          <div class="text-[var(--text-main)] leading-snug text-[11px]">Loaded A-Shift Schedule (Sunday, November 15, 2026). Shift Count: 32 / Shift Minimum: 32.</div>
-        </div>
-      </div>
+            <div id="auditMiniList" class="space-y-1.5 max-h-44 overflow-y-auto pr-1 text-xs"></div>
           </div>
         </div>
 
@@ -2108,95 +618,16 @@
                   <div class="text-[10px] text-slate-400 mt-0.5">Officer Mobile App</div>
                 </div>
               </div>
-              <span id="mobileAppShiftBadge" class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30">A-Shift • Sun, Nov 15</span>
+              <span id="mobileAppShiftBadge" class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                A-Shift • 11/15
+              </span>
             </div>
           </div>
 
           <!-- Mobile App Body (Dynamically synced to loggedInPe!) -->
           <div id="mobileAppBody" class="p-4 space-y-3.5 bg-slate-950 min-h-[470px] text-xs">
-          <!-- Officer Identity Card -->
-          <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-            <div class="flex items-center justify-between">
-              <div>
-                <span class="text-[10px] uppercase tracking-wider text-blue-400 font-bold">Logged-In Officer</span>
-                <div class="text-sm font-extrabold text-white">MAURER, A</div>
-              </div>
-              <div class="text-right font-mono">
-                <span class="text-[10px] text-slate-400 block">Seniority</span>
-                <span class="text-xs font-bold text-amber-300">PE #1883</span>
-              </div>
-            </div>
-
-            <!-- Current Car Assignment Box -->
-            <div class="p-3 rounded-xl bg-blue-600/15 border border-blue-500/30 flex items-center justify-between">
-              <div>
-                <div class="text-[10px] uppercase font-bold text-blue-300">
-                  🟢 Active Patrol Assignment
-                </div>
-                <div class="text-lg font-black font-mono text-white mt-0.5">
-                  Unit M419 <span class="text-xs font-normal text-slate-300">(Southeast)</span>
-                </div>
-                <div class="text-[10px] text-slate-400 mt-0.5">A-Shift • 0600–1430 hrs • Dist M</div>
-              </div>
-              <div class="w-10 h-10 rounded-xl bg-slate-900/80 flex items-center justify-center font-mono font-black text-sm border border-slate-700">
-                M
-              </div>
-            </div>
+            <!-- Populated dynamically by JS -->
           </div>
-
-          <!-- Shift Staffing Meter -->
-          <div class="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-            <div>
-              <div class="text-[10px] text-slate-400 uppercase font-bold">Shift Staffing Count</div>
-              <div class="text-xs font-semibold text-white mt-0.5">
-                Count: <span class="font-mono font-bold">32</span> / Min: <span class="font-mono font-bold">32</span>
-              </div>
-            </div>
-            <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-400/20 text-amber-300">
-              At Minimum Count
-            </span>
-          </div>
-
-          <!-- Quick Self-Service Actions -->
-          <div class="space-y-1.5">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">
-              Quick Officer Actions (Tap to Submit)
-            </div>
-            <button onclick="handleOfficerStatusSelect('SE', 'M419', 'SICK')" class="w-full p-3 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 flex items-center justify-between text-left transition cursor-pointer">
-              <div>
-                <div class="font-bold text-red-300">🤒 Call In Sick Leave</div>
-                <div class="text-[10px] text-slate-400">Moves you to Day Off &amp; auto-floats coverage</div>
-              </div>
-              <span class="text-xs text-red-300 font-bold">→</span>
-            </button>
-
-            <button onclick="handleOfficerStatusSelect('SE', 'M419', 'DAY_OFF_VAC')" class="w-full p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 flex items-center justify-between text-left transition cursor-pointer">
-              <div>
-                <div class="font-bold text-white">🏖️ Request Day Off (Vacation)</div>
-                <div class="text-[10px] text-slate-400">Checks Shift Minimum (32/32) per Art. 43</div>
-              </div>
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300">
-                Min Check
-              </span>
-            </button>
-
-            <button onclick="handleOfficerStatusSelect('SE', 'M419', 'DAY_OFF_PERS')" class="w-full p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 flex items-center justify-between text-left transition cursor-pointer">
-              <div>
-                <div class="font-bold text-white">📅 Request Personal Day</div>
-                <div class="text-[10px] text-slate-400">1-hr or full shift • Subject to minimum count</div>
-              </div>
-              <span class="text-xs text-slate-400">→</span>
-            </button>
-
-            <button onclick="handleOfficerStatusSelect('SE', 'M419', 'BEREAVEMENT')" class="w-full p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 flex items-center justify-between text-left transition cursor-pointer">
-              <div>
-                <div class="font-bold text-white">🕊️ Bereavement Leave (Art. 45)</div>
-                <div class="text-[10px] text-slate-400">Bypasses minimum count automatically</div>
-              </div>
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300">Exempt</span>
-            </button>
-          </div>
-        </div>
 
           <!-- Phone Home Indicator -->
           <div class="py-2.5 bg-slate-950 flex justify-center">
@@ -13353,148 +11784,5 @@
 
     initApp();
   </script>
-
-
-<script>(function(){var t=window.tailwind=window.tailwind||{};if(!t.config){t.config={darkMode:'class'};}else if(t.config.darkMode!=='class'){t.config.darkMode='class';}})();</script>
-        <script>
-          (function() {
-            function sendInteraction(eventType) {
-              window.parent.postMessage({ type: 'USER_INTERACTION', eventType: eventType }, '*');
-            }
-            document.addEventListener('click', function() { sendInteraction('click'); }, true);
-          })();
-        </script>
-      
-        <script>
-          (function() {
-            var SVG_NS = 'http://www.w3.org/2000/svg';
-            var XLINK_NS = 'http://www.w3.org/1999/xlink';
-
-            function rawHrefOf(el) {
-              if (el.hasAttribute('href')) {
-                return el.getAttribute('href');
-              }
-              if (el.namespaceURI === SVG_NS) {
-                if (el.hasAttribute('xlink:href')) {
-                  return el.getAttribute('xlink:href');
-                }
-                if (typeof el.hasAttributeNS === 'function' && el.hasAttributeNS(XLINK_NS, 'href')) {
-                  return el.getAttributeNS(XLINK_NS, 'href');
-                }
-              }
-              return null;
-            }
-
-            function isTargetLink(node) {
-              if (!node || node.nodeType !== 1 || typeof node.hasAttribute !== 'function') {
-                return false;
-              }
-              var tag = String(node.localName || node.tagName || '').toLowerCase();
-              var isLink = node.namespaceURI === SVG_NS
-                ? tag === 'a'
-                : tag === 'a' || tag === 'area';
-              return isLink && rawHrefOf(node) !== null;
-            }
-
-            function findLink(e) {
-              var path = typeof e.composedPath === 'function' ? e.composedPath() : null;
-              if (path && path.length) {
-                for (var i = 0; i < path.length; i++) {
-                  if (isTargetLink(path[i])) {
-                    return path[i];
-                  }
-                }
-                return null;
-              }
-              var n = e.target;
-              while (n) {
-                if (isTargetLink(n)) {
-                  return n;
-                }
-                n = n.parentElement || n.parentNode || null;
-              }
-              return null;
-            }
-
-            function scrollTopZero() {
-              window.scrollTo(0, 0);
-              if (document.documentElement) {
-                document.documentElement.scrollTop = 0;
-                document.documentElement.scrollLeft = 0;
-              }
-              if (document.body) {
-                document.body.scrollTop = 0;
-                document.body.scrollLeft = 0;
-              }
-            }
-
-            document.addEventListener('click', function(e) {
-              if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
-                return;
-              }
-              var link = findLink(e);
-              if (!link) {
-                return;
-              }
-              var tgt = (link.getAttribute('target') || '').trim().toLowerCase();
-              if (tgt !== '' && tgt !== '_self') {
-                return;
-              }
-              var rawHref = rawHrefOf(link);
-              var href = (rawHref || '').trim();
-              if (href.charAt(0) !== '#') {
-                return;
-              }
-              // Opaque-origin srcdoc frames resolve relative #fragment links against the
-              // inherited parent URL (hitting X-Frame-Options: SAMEORIGIN), so handle them
-              // in-frame and never let Chromium navigate even when no target exists.
-              e.preventDefault();
-              var frag = href.slice(1);
-              if (frag === '') {
-                scrollTopZero();
-                return;
-              }
-              var decoded = frag;
-              try {
-                decoded = decodeURIComponent(frag);
-              } catch (err) {
-                decoded = frag;
-              }
-              var keys = decoded === frag ? [frag] : [frag, decoded];
-              var root = typeof link.getRootNode === 'function' ? link.getRootNode() : null;
-              var hasScopedRoot = Boolean(root && root !== document && typeof root.getElementById === 'function');
-              var targetEl = null;
-              for (var i = 0; i < keys.length && !targetEl; i++) {
-                var k = keys[i];
-                if (!k) {
-                  continue;
-                }
-                targetEl = (hasScopedRoot && root.getElementById(k)) || document.getElementById(k);
-              }
-              if (!targetEl) {
-                for (var j = 0; j < keys.length && !targetEl; j++) {
-                  var nameKey = keys[j];
-                  if (!nameKey) {
-                    continue;
-                  }
-                  var named = document.getElementsByName(nameKey);
-                  for (var m = 0; m < named.length; m++) {
-                    var cand = named[m];
-                    if (cand.namespaceURI !== SVG_NS && String(cand.localName || cand.tagName || '').toLowerCase() === 'a') {
-                      targetEl = cand;
-                      break;
-                    }
-                  }
-                }
-              }
-              if (targetEl) {
-                targetEl.scrollIntoView();
-                return;
-              }
-              if (decoded.toLowerCase() === 'top') {
-                scrollTopZero();
-              }
-            });
-          })();
-        </script>
-      <script>(function(){var head=document.head;var s=head&&head.querySelector('style[data-host-theme]');window.addEventListener('message',function(event){if(event.source!==window.parent||!event.data||event.data.type!=='THEME_SYNC'||typeof event.data.cssVariables!=='object'||!event.data.cssVariables)return;var vars=event.data.cssVariables;var entries=Object.entries(vars).filter(function(e){return typeof e[0]==='string'&&/^--[a-zA-Z0-9-]+$/.test(e[0])&&typeof e[1]==='string'&&!/[;{}\r\n]|<\/style/i.test(e[1]);});var rootBlock=entries.length?':root { '+entries.map(function(e){return e[0]+': '+e[1]+';';}).join(' ')+' }':'';if(!s&&(true)&&head){var csp=head.querySelector('meta[http-equiv="Content-Security-Policy"]');s=document.createElement('style');s.setAttribute('data-host-theme','');head.insertBefore(s,csp?csp.nextSibling:head.firstChild);}var mode=vars['--theme-type']==='light'?'light':'dark';var other=mode==='light'?'dark':'light';if(s)s.textContent=(rootBlock?rootBlock+' ':'')+"html, body { margin: 0; padding: 0; overflow: hidden; color-scheme: "+mode+"; background-color: transparent; color: var(--foreground, inherit); font-family: var(--font-family, sans-serif); } html { font-size: 16px; } body { font-size: var(--font-size, 14px); } body :is(code, pre, kbd, samp), body .font-mono { font-family: var(--editor-font-family, ui-monospace, monospace); }";var cl=document.documentElement.classList;if(!cl.contains(mode)||cl.contains(other)){cl.remove(other);cl.add(mode);}window.dispatchEvent(new CustomEvent('themechange',{detail:{themeMode:mode,cssVariables:vars}}));});})();</script></body></html>
+</body>
+</html>
