@@ -1,0 +1,345 @@
+/* =========================================================================
+   FWPD "The Books" — Roll-Call Print & Backup/Export Add-on Stylesheet
+   ========================================================================= */
+
+/* Screen-only & Print-only helpers */
+.print-only-footer {
+  display: none;
+}
+
+.print-preview-toolbar {
+  display: none;
+}
+
+/* Backup / Export Dropdown Menu */
+.backup-dropdown-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.backup-dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 110;
+  width: 260px;
+  background-color: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 20px 38px -6px rgba(2, 6, 23, 0.55), 0 8px 16px -4px rgba(2, 6, 23, 0.35);
+  transform-origin: top right;
+  animation: menuPop 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.backup-dropdown-menu.hidden {
+  display: none !important;
+}
+
+.backup-menu-item {
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.backup-menu-item:hover {
+  background-color: #1e293b;
+  color: #ffffff;
+}
+
+.backup-menu-tag {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background-color: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* Persistence "Saved" status pill pulse */
+@keyframes saveBadgeFlash {
+  0% { transform: scale(1.06); background-color: rgba(16, 185, 129, 0.32); }
+  100% { transform: scale(1); }
+}
+
+.save-badge-flash {
+  animation: saveBadgeFlash 0.45s ease-out;
+}
+
+/* =========================================================================
+   ON-SCREEN ROLL-CALL PRINT PREVIEW MODE (body.rollcall-print-preview)
+   Works inside sandboxed preview iframes where window.print() is blocked!
+   ========================================================================= */
+body.rollcall-print-preview {
+  --bg-app: #334155 !important;
+  --bg-surface: #ffffff !important;
+  --bg-subtle: #f8fafc !important;
+  --bg-header: #0f172a !important;
+  --bg-div-head: #1e293b !important;
+  --bg-col-head: #f1f5f9 !important;
+  --border-grid: #cbd5e1 !important;
+  --border-strong: #64748b !important;
+  --text-main: #0f172a !important;
+  --text-muted: #334155 !important;
+  --text-faint: #64748b !important;
+  --accent-blue: #1d4ed8 !important;
+  --accent-blue-soft: transparent !important;
+  --float-bg: #fef3c7 !important;
+  --float-border: #d97706 !important;
+  --float-text: #78350f !important;
+  --dayoff-bg: #fee2e2 !important;
+  --dayoff-text: #991b1b !important;
+  background-color: #334155 !important;
+  color: #0f172a !important;
+  padding: 64px 16px 24px 16px !important;
+}
+
+body.rollcall-print-preview .print-preview-toolbar {
+  display: flex !important;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background-color: #0f172a;
+  color: #f8fafc;
+  border-bottom: 1px solid #334155;
+  padding: 10px 18px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.45);
+}
+
+body.rollcall-print-preview header,
+body.rollcall-print-preview #transactionToast,
+body.rollcall-print-preview #mobileAppPane,
+body.rollcall-print-preview #floatingActionMenu,
+body.rollcall-print-preview #publishHelperModal,
+body.rollcall-print-preview .caret-btn,
+body.rollcall-print-preview .max-w-\[1680px\] > .flex > .flex-1 > .grid,
+body.rollcall-print-preview #sheetMinBanner + div,
+body.rollcall-print-preview .books-sheet-card > div:nth-child(3) {
+  display: none !important;
+}
+
+body.rollcall-print-preview .row-logged-in {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+body.rollcall-print-preview .max-w-\[1680px\] {
+  max-width: 1100px !important;
+  margin: 0 auto !important;
+}
+
+body.rollcall-print-preview .books-sheet-card {
+  background-color: #ffffff !important;
+  border: 2px solid #0f172a !important;
+  border-radius: 4px !important;
+  padding: 14px 16px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55) !important;
+}
+
+body.rollcall-print-preview .books-sheet-card > div:first-child {
+  padding: 6px 10px !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  border-bottom: 1.5px solid #0f172a !important;
+  background-color: #f8fafc !important;
+}
+
+body.rollcall-print-preview .books-table th,
+body.rollcall-print-preview .books-table td {
+  padding: 1.5px 4px !important;
+  font-size: 9px !important;
+  line-height: 1.15 !important;
+  height: 15px !important;
+  border-color: #94a3b8 !important;
+}
+
+body.rollcall-print-preview .div-title-cell {
+  padding: 3px 6px !important;
+  font-size: 9.5px !important;
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+}
+
+body.rollcall-print-preview .col-sub-cell {
+  padding: 2px 4px !important;
+  font-size: 8.5px !important;
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  border-bottom: 1.2px solid #0f172a !important;
+}
+
+body.rollcall-print-preview .print-only-footer {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  padding: 6px 8px !important;
+  border-top: 1.5px solid #0f172a !important;
+  background-color: #f8fafc !important;
+  font-size: 9px !important;
+  color: #0f172a !important;
+}
+
+/* =========================================================================
+   SINGLE-PAGE US LETTER LANDSCAPE OFFICIAL FWPD ROLL-CALL WORKSHEET
+   ========================================================================= */
+@media print {
+  @page {
+    size: letter landscape;
+    margin: 0.22in 0.25in;
+  }
+
+  /* Force crisp high-contrast paper colors regardless of Dark Mode */
+  :root,
+  html,
+  body,
+  body.dark-mode,
+  body.rollcall-print-preview {
+    --bg-app: #ffffff !important;
+    --bg-surface: #ffffff !important;
+    --bg-subtle: #f8fafc !important;
+    --bg-header: #0f172a !important;
+    --bg-div-head: #1e293b !important;
+    --bg-col-head: #f1f5f9 !important;
+    --border-grid: #cbd5e1 !important;
+    --border-strong: #64748b !important;
+    --text-main: #0f172a !important;
+    --text-muted: #334155 !important;
+    --text-faint: #64748b !important;
+    --accent-blue: #1d4ed8 !important;
+    --accent-blue-soft: transparent !important;
+    --float-bg: #fef3c7 !important;
+    --float-border: #d97706 !important;
+    --float-text: #78350f !important;
+    --dayoff-bg: #fee2e2 !important;
+    --dayoff-text: #991b1b !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    color-scheme: light !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Hide non-worksheet UI chrome (including the preview toolbar) */
+  header,
+  .print-preview-toolbar,
+  #transactionToast,
+  #mobileAppPane,
+  #floatingActionMenu,
+  #publishHelperModal,
+  .caret-btn,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Hide the 3 bottom web analytics cards and interactive demo min controls */
+  .max-w-\[1680px\] > .flex > .flex-1 > .grid {
+    display: none !important;
+  }
+
+  /* Hide interactive + / - / Open 1 Leave Slot demo buttons next to MINIMUM COUNT pill */
+  #sheetMinBanner + div {
+    display: none !important;
+  }
+
+  /* Remove logged-in blue row highlight on print so paper sheet is neutral */
+  .row-logged-in {
+    background-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Remove scrollbars and min-width constraints so table fits 100% of landscape width */
+  .max-w-\[1680px\],
+  .min-w-\[1120px\],
+  .overflow-x-auto {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .books-sheet-card {
+    border: 1.5px solid #0f172a !important;
+    border-radius: 4px !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Compact Sheet Header Bar for 1-Page Fit */
+  .books-sheet-card > div:first-child {
+    padding: 4px 10px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    border-bottom: 1.5px solid #0f172a !important;
+    background-color: #f8fafc !important;
+  }
+
+  /* Ultra-crisp cell sizing so 8 Command + 31 Patrol + Day-Off rows fit on 1 page */
+  .books-table th,
+  .books-table td {
+    padding: 1px 4px !important;
+    font-size: 8.5px !important;
+    line-height: 1.12 !important;
+    height: 13.5px !important;
+    border-color: #94a3b8 !important;
+  }
+
+  .div-title-cell {
+    padding: 2.5px 6px !important;
+    font-size: 9px !important;
+    background-color: #0f172a !important;
+    color: #ffffff !important;
+  }
+
+  .col-sub-cell {
+    padding: 1.5px 4px !important;
+    font-size: 8px !important;
+    background-color: #e2e8f0 !important;
+    color: #0f172a !important;
+    border-bottom: 1.2px solid #0f172a !important;
+  }
+
+  .unit-cell {
+    font-size: 8.5px !important;
+  }
+
+  /* Hide screen legend and show official Roll-Call Print Footer instead */
+  .books-sheet-card > div:nth-child(3) {
+    display: none !important;
+  }
+
+  .print-only-footer {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+    padding: 4px 8px !important;
+    border-top: 1.5px solid #0f172a !important;
+    background-color: #f8fafc !important;
+    font-size: 8.5px !important;
+    color: #0f172a !important;
+  }
+}

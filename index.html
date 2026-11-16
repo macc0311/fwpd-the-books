@@ -11802,7 +11802,7 @@
 
     function changeMinimum(delta) {
       app.shiftMin = Math.max(1, app.shiftMin + delta);
-      renderAll();
+      recalculateFloats();
     }
 
     function setMinForVacationDemo() {
@@ -11814,19 +11814,13 @@
         step2: '',
         step3: ''
       };
-      renderAll();
+      recalculateFloats();
     }
 
     function resetSchedule() {
       app.shiftMin = 32;
       closeActionPopover();
       initApp();
-    }
-
-    function fillHireBackNow(candIdx) {
-      const cand = HIREBACK_POOL[candIdx];
-      if (!cand) return;
-      awardCrossShiftHireBack(cand.pe, cand.name, cand.shift || 'B', null, null);
     }
 
     // =========================================================================
@@ -12328,13 +12322,13 @@
             </button>
           </div>
           <div class="grid grid-cols-3 gap-1 text-[10px]">
-            <button onclick="switchUserRole('1883')" class="px-1.5 py-1 rounded-lg font-bold truncate cursor-pointer transition ${targetPe === 1883 ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
+            <button onclick="handleUserSwitch('1883')" class="px-1.5 py-1 rounded-lg font-bold truncate cursor-pointer transition ${targetPe === 1883 ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
               👮 Maurer #1883
             </button>
-            <button onclick="switchUserRole('1586')" class="px-1.5 py-1 rounded-lg font-bold truncate cursor-pointer transition ${targetPe === 1586 ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
+            <button onclick="handleUserSwitch('1586')" class="px-1.5 py-1 rounded-lg font-bold truncate cursor-pointer transition ${targetPe === 1586 ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
               🏖️ Engelman #1586
             </button>
-            <button onclick="switchUserRole('1997')" class="px-1.5 py-1 rounded-lg font-bold truncate cursor-pointer transition ${targetPe === 1997 ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
+            <button onclick="handleUserSwitch('1997')" class="px-1.5 py-1 rounded-lg font-bold truncate cursor-pointer transition ${targetPe === 1997 ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
               ⚡ Aguilera #1997
             </button>
           </div>
@@ -12767,10 +12761,19 @@
       clone.querySelectorAll('head style').forEach(st => {
         if (!st.textContent.includes('--bg-app')) st.remove();
       });
-      const btn = clone.querySelector('#publishHelperBtn');
-      if (btn) btn.remove();
-      const modal = clone.querySelector('#publishHelperModal');
-      if (modal) modal.remove();
+      const dynamicIds = [
+        '#publishHelperBtn',
+        '#publishHelperModal',
+        '#hbZeroTouchControlBar',
+        '#persistenceStatusBadge',
+        '#printRollCallBtn',
+        '#backupExportDropdownWrap',
+        '#printRollCallFooter',
+        '#rollCallPrintPreviewToolbar',
+        '#hbBidderNotificationModal',
+        '#mobileHbLiveCenter'
+      ];
+      clone.querySelectorAll(dynamicIds.join(', ')).forEach(el => el.remove());
       const toast = clone.querySelector('#transactionToast');
       if (toast) { toast.className = 'hidden rounded-2xl p-3.5 border shadow-md transition-all'; toast.innerHTML = ''; }
       const menu = clone.querySelector('#floatingActionMenu');
@@ -12889,5 +12892,10 @@
 
     initApp();
   </script>
+  <!-- bmac-dev Modular Extensions -->
+  <link rel="stylesheet" href="css/print-rollcall.css">
+  <link rel="stylesheet" href="css/hireback-engine.css">
+  <script src="js/hireback-engine.js"></script>
+  <script src="js/persistence-print-export.js"></script>
 </body>
 </html>

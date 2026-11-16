@@ -1,9 +1,9 @@
 # ARCHITECTURE.md — FWPD "The Books"
 
 **Repository:** `/home/antigravity/macc0311/fwpd-the-books`  
-**Active Branch:** `macc-dev` (synced with `main`)  
-**Primary Runtime Artifact:** `index.html` (12,893 lines / 355,391 bytes — self-contained HTML + CSS + JavaScript monolith)  
-**Target Environment:** Static browser SPA / GitHub Pages (`macc0311/fwpd-the-books`), zero build step, zero backend database
+**Active Branch:** `macc-dev` (merged with `bmac-dev`, synced with `main`)  
+**Primary Runtime Artifacts:** `index.html` (12,902 lines / 355,738 bytes) + modular extensions in `css/` (`hireback-engine.css`, `print-rollcall.css`) and `js/` (`hireback-engine.js`, `persistence-print-export.js`)  
+**Target Environment:** Zero-build static browser SPA / GitHub Pages (`macc0311/fwpd-the-books`), backed by browser `localStorage` (`fwpd_the_books_state_v3_0_unified`) and JSON/CSV export
 
 ---
 
@@ -13,24 +13,27 @@
 
 | File | Size (Bytes) | Lines | Role |
 | :--- | ---: | ---: | :--- |
-| `index.html` | 355,391 | 12,893 | Complete single-file application: CSS design system, DOM layout (Top Navbar, Toast, 4-Division Worksheet, Mobile App Companion, Bottom Analytics/Audit Grid, Popover, Publish Modal), embedded multi-shift/bureau schedule templates, 290-officer directory, scheduling/float/leave/hire-back engines, and standalone HTML release exporter. |
-| `docs/ARCHITECTURE.md` | — | — | Codebase topology, DOM/CSS map, state & schema specification, subsystem function inventory, and known technical debt. |
-| `docs/RULES.md` | — | — | Enforced runtime business rules, consolidated 2026 PBA & FOPLC CBA scheduling rules, gap analysis, and engineering guardrails. |
+| `index.html` | 355,738 | 12,902 | Core application: CSS design system, DOM layout, multi-shift/bureau schedule templates (`ALL_SCHEDULES` + `DB_SCHEDULES`), 290-officer `MASTER_OPERATIONS_DIRECTORY`, core float/leave/RTW/search engines, companion mobile UI, standalone release exporter, and bottom `<link>`/`<script>` extension includes (`L12895-12899`). |
+| `js/hireback-engine.js` | 111,464 | 2,444 | Zero-Touch Hire-Back & Overtime Bidding Engine (`PBA Art. 35` & `FOPLC Art. 24–26`): countdown auto-award (`12s` seniority / `<24h` FCFS), partial `4h` split blocks, `C`-shift AM training Last-4h rule, Duty Chief post-start gate, Supervisor/Acting COD audit, un-awarded HB cancellation alerts to opted-in officers, and lifecycle hooks wrapping `window.*` core handlers. |
+| `js/persistence-print-export.js` | 32,164 | 788 | `localStorage` auto-save/restore (`fwpd_the_books_state_v3_0_unified`), 1-page US Letter Landscape Roll-Call Print Preview + standalone printable HTML download, `.json` state backup/restore, and roster/audit `.csv` exporters. |
+| `css/hireback-engine.css` | 2,692 | 114 | Styling for `#hbZeroTouchControlBar`, notice mode pills, `.row-hireback-awarded`, `.row-acting-cod`, `.row-cmd-off`, timer progress bars, and print-mode suppression. |
+| `css/print-rollcall.css` | 9,897 | 346 | Backup/Export dropdown styles, `@media print` & `body.rollcall-print-preview` single-page US Letter Landscape layout, `#rollCallPrintPreviewToolbar`, and `#printRollCallFooter`. |
+| `docs/ARCHITECTURE.md` | — | — | Codebase topology, DOM/CSS map, state & schema specification, modular hook chain, subsystem inventory, and known technical debt. |
+| `docs/RULES.md` | — | — | Enforced runtime business rules, consolidated 2026 PBA & FOPLC CBA reference, gap analysis, and engineering guardrails. |
 
 > **Archived CBA Sources (Token Optimization):** Raw contract source files (`PBA_Contract_2026.md`, `PBA_Contract_2026.docx`, `FOPLC_Contract_2026.md`, `2026 FOPLC Final Contract.pdf` — preserved at commit `e91d318`) and `CONTRACT_RULES.md` (`10bdf32`) were consolidated into `docs/RULES.md` and removed from the active tree to keep repository scans fast and token-efficient.
 
 ### 1.2 Git Branch & Recent History
 
-- **`macc-dev`** (`* macc-dev`, tracking `origin/macc-dev`): Active personal development branch synced cleanly with `main`.
-- **`main`** (`origin/main`, `origin/HEAD -> origin/main`): Production/GitHub Pages branch carrying the verified `index.html` and consolidated `docs/` reference files.
-- **`bmac-dev`** (`origin/bmac-dev`): Collaborator development branch (`css/` and `js/` modular extensions for zero-touch hire-back countdown, persistence, and roll-call print).
+- **`macc-dev`** (`* macc-dev`, tracking `origin/macc-dev`): Active development branch containing both Luke's base platform and Ben's (`bmac-dev`) modular `js/` & `css/` extensions with integration fixes verified.
+- **`main`** (`origin/main`, `origin/HEAD -> origin/main`): Production/GitHub Pages branch kept aligned cleanly with `macc-dev` (excluding `CONTRACT_RULES.md` and raw `.md`/`.docx`/`.pdf` contracts).
+- **`bmac-dev`** (`origin/bmac-dev`): Collaborator development branch (`bf7d6f0`, merged into `macc-dev`) introducing `css/` and `js/` modular add-ons for zero-touch hire-back countdowns, supervisor/Acting COD auditing, `localStorage` persistence, and 1-page roll-call print/export.
 - **Key Recent Commits:**
+  - `bf7d6f0` (`bmac-dev`) — Added `12s` bid timer, FCFS `0`-bid waiting mode, and un-awarded Hire-Back cancellation notifications to all opted-in officers (merged & integration-fixed into `macc-dev`).
+  - `a5bacbd` / `9cefa6f` — Option A cleanup consolidating `CONTRACT_RULES.md` into `docs/RULES.md` and `docs/ARCHITECTURE.md`.
   - `6123c40` — Pause floating when shift drops below minimum so awarded Hire-Back fills vacated role directly.
   - `b230954` — Automate Hire-Back opt-in notifications, bidding engine (`>=24hr` seniority vs `<24hr` FCFS), and winner schedule placement.
-  - `4dcbd71` — Order Hire-Back search filter tabs as `A`, `B`, `C`, and `All`.
-  - `66f685c` — Replace Hire-Back Quick Award section with searchable officer database.
-  - `dd0db4e` — Enable toggling any officer, return-to-work from scheduled off-time, and minimalist cross-shift hire-backs.
-  - `9de0fb7` — Unify marked-off officers into bottom Scheduled Off-Time category columns.
+  - `66f685c` / `4dcbd71` — Searchable `MASTER_OPERATIONS_DIRECTORY` Hire-Back database with `A | B | C | All` filter tabs.
 
 ---
 
@@ -38,40 +41,52 @@
 
 ```
 +-----------------------------------------------------------------------------------+
-|                               index.html (12,893 lines)                           |
+|                               index.html (12,902 lines)                           |
 |                                                                                   |
 |  1. <head> (L3-213)         : Tailwind CDNs + CSS Custom Properties & Grid CSS    |
 |  2. <body> HTML (L214-647)  : Header Navbar, Toast, Split Workspace, Popover      |
 |  3. Data Layer (L650-10244) : DIV_DISTRICTS, ALL_SCHEDULES + DB_SCHEDULES,        |
 |                               MASTER_OPERATIONS_DIRECTORY, DEFAULT_OPT_IN_PES     |
-|  4. State & Helpers (L10246): app state + savedHistory (in-memory only!)          |
-|  5. Engines (L10649-11830)  : Float Engine, Popovers, Hire-Back Engine, Leave/RTW |
-|  6. Renderers (L11835-12762): Worksheet, Off-Time, Mobile App, Bottom Cards       |
-|  7. Exporter (L12764-12888) : Standalone HTML builder & GitHub publish modal      |
-+-----------------------------------------------------------------------------------+
+|  4. State & Helpers (L10246): app state + savedHistory                            |
+|  5. Core Engines (L10649+)  : Float Engine, Popovers, Hire-Back DB, Leave/RTW     |
+|  6. Renderers (L11829+)     : Worksheet, Off-Time, Mobile App, Bottom Cards       |
+|  7. Exporter (L12758-12891) : Standalone HTML builder & GitHub publish modal      |
+|  8. Extensions (L12895-99)  : css/print-rollcall.css, css/hireback-engine.css,    |
+|                               js/hireback-engine.js, js/persistence-print-export.js|
++-----------------------------------------+-----------------------------------------+
+                                          | DOMContentLoaded hook chain
+          +-------------------------------+-------------------------------+
+          v                                                               v
++-----------------------------------+                       +-------------------------------+
+|    js/hireback-engine.js (IIFE)   |  window.renderAll()   | js/persistence-print-export.js|
+|  Layer 1 wrappers on core globals | <-------------------- |  Layer 2 wrappers + Navbar UI |
+|  Timer loop, Supv/COD audit, HB   |                       |  Print preview & localStorage |
++-----------------------------------+                       +-------------------------------+
 ```
 
-### 2.1 External Dependencies & Persistence Constraints
+### 2.1 External Dependencies & Persistence Architecture
 
 1. **Tailwind CSS Runtime Coupling (`index.html` L7–8):**
    - Loads **both** `https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js` (L7) and `https://cdn.tailwindcss.com` (L8) in `<head>`.
-   - Zero build pipeline; Tailwind utility classes are compiled client-side in the browser at runtime. Offline use without CDN access loses utility styling unless a local stylesheet is introduced.
-2. **In-Memory Only Persistence:**
-   - All shift edits, leave approvals, floats, hire-back bids, opt-in toggles, and audit logs live strictly in the JavaScript `app` object and `app.savedHistory` (`L10246-10268`).
-   - There is **no** backend API, **no** database, and **no** `localStorage` / `sessionStorage` persistence. Reloading the browser tab resets all state back to initial template values via `initApp()` (`L12890`).
-3. **Preview Artifact & GitHub Pages Release Coupling (`L12758-12888`):**
-   - `#publishHelperBtn` (`L321`) automatically hides when `window.location.hostname.includes('github.io')` (`L12759-12762`).
-   - Inside preview environments (e.g., Antigravity web preview iframe), `buildStandaloneReleaseHtml()` (`L12764-12779`) clones `document.documentElement`, strips injected preview `<style>` tags that lack `--bg-app` (`L12767-12769`), removes `#publishHelperBtn` and `#publishHelperModal`, resets `#transactionToast` and `#floatingActionMenu`, and outputs clean standalone HTML for direct commit to `macc-dev` or `main`.
+   - Zero build pipeline; Tailwind utility classes are compiled client-side in the browser at runtime.
+2. **`localStorage` Auto-Persistence + In-Memory `savedHistory`:**
+   - Every render (`window.renderAll`), theme toggle, view mode toggle, and JSON import persists full state (`schemaVersion: "3.0.0"`, `selectedBureau/Date/Shift`, `command`, `officers`, `dayOffRoster`, `offTimeSheet`, `hireBackOptInPes`, `hireBackNoticeMode`, `hireBackBids`, `floatedMoves`, `auditEntries`, `savedHistory`, and `hbEngine`) under `localStorage` key **`fwpd_the_books_state_v3_0_unified`**.
+   - On startup, `persistence-print-export.js` restores `localStorage` automatically (`restoreStateFromStorage()`), then `hireback-engine.js` re-audits open shortages and resumes countdown timers.
+   - Clicking `↺ Reset` (`resetSchedule()`) clears `localStorage` (`STORAGE_KEY`), resets `app.hbEngine`, restores factory defaults, and updates `#persistenceStatusBadge` to `↺ Reset to Default`.
+   - Switching bureau/date/shift still checkpoints the active worksheet in `app.savedHistory` (`saveCurrentShiftSnapshot()`).
+3. **Preview Artifact & Standalone Release Exporter (`L12752-12891`):**
+   - `#publishHelperBtn` (`L321`) auto-hides on `github.io` (`L12753`).
+   - `buildStandaloneReleaseHtml()` (`L12758-12783`) strips injected preview styles lacking `--bg-app` **and** strips runtime-injected modular DOM elements (`#publishHelperBtn`, `#publishHelperModal`, `#hbZeroTouchControlBar`, `#persistenceStatusBadge`, `#printRollCallBtn`, `#backupExportDropdownWrap`, `#printRollCallFooter`, `#rollCallPrintPreviewToolbar`, `#hbBidderNotificationModal`, `#mobileHbLiveCenter`) so exported HTML cleanly re-creates fresh DOM controls and event listeners on load.
 
 ---
 
-## 3. CSS Design System & State Styling (`index.html` L9–212)
+## 3. CSS Design System & State Styling
 
-### 3.1 Theme Custom Properties (`:root` L10–29 & `body.dark-mode` L31–50)
+### 3.1 Theme Custom Properties (`index.html` `:root` L10–29 & `body.dark-mode` L31–50)
 
 | CSS Token | Light (`:root`) | Dark (`body.dark-mode`) | Purpose |
 | :--- | :--- | :--- | :--- |
-| `--bg-app` | `#f1f5f9` | `#090d16` | Page canvas background (also sentinel checked in `buildStandaloneReleaseHtml()` L12768) |
+| `--bg-app` | `#f1f5f9` | `#090d16` | Page canvas background (also sentinel checked in `buildStandaloneReleaseHtml()` L12762) |
 | `--bg-surface` | `#ffffff` | `#111827` | Cards, popovers, shift metrics boxes |
 | `--bg-subtle` | `#f8fafc` | `#1e293b` | Unit cells, sheet header/footer bars, floated-out slots |
 | `--bg-header` | `#0f172a` | `#0f172a` | Top navbar background token |
@@ -90,44 +105,35 @@
 | `--dayoff-bg` | `#fef2f2` | `rgba(239, 68, 68, 0.12)` | Dynamic marked-off cell tint in bottom Off-Time table |
 | `--dayoff-text` | `#991b1b` | `#fca5a5` | Dynamic marked-off officer name text color |
 
-### 3.2 Worksheet, Interactive & Companion Component Classes
+### 3.2 Core & Modular Component Classes
 
-| Selector | Lines | Visual Behavior & Purpose |
+| Selector | Source | Visual Behavior & Purpose |
 | :--- | :--- | :--- |
-| `.books-sheet-card` | `L60-66` | Rounded 14px bordered card container with elevation shadow. |
-| `.books-table` | `L68-85` | `table-layout: fixed`, `border-collapse: collapse`, compact `25px` row height, `11.5px` text with ellipsis truncation. |
-| `.div-sep-right` | `L88-90` | `2px solid var(--border-strong) !important` vertical divider between `NW | NE | SW | SE` columns (and 4 off-time columns). |
-| `.div-title-cell` | `L92-100` | Uppercase dark division title bar (`--bg-div-head`). |
-| `.col-sub-cell` | `L102-111` | `10px` bold centered column header (`UNIT`, `OFFICERS`, `ASSIGN`). |
-| `.unit-cell` | `L113-119` | Monospace centered unit slot identifier (`C117`, `M419`, `543`). |
-| `.unit-bid-car` | `L122-129` | Standing Union Bid Car indicator: bold underlined text, emerald `rgba(16,185,129,0.08)` tint, `inset 2.5px 0 0 #10b981` left bar. |
-| `.row-logged-in` | `L132-135` | Blue highlight (`--accent-blue-soft` + 3px left `--accent-blue` bar) for the currently selected `app.loggedInPe` across active roster and bottom off-time rows. |
-| `.row-floated-in` & `@keyframes rowPulse` | `L138-153` | Amber highlight (`--float-bg` + 3px left `--float-border` bar + `0.9s` pulse) applied to floated-in, Hire-Back (`isHireBack`), and Returned-to-Work (`isReturnedOffTime`) cells. |
-| `.row-floated-out` | `L145-148` | Subtle muted styling (`--bg-subtle`) for vacated or floated-away slots. |
-| `.caret-btn` | `L156-183` | `18x18px` `▾` action menu trigger shown on every occupied officer row and bottom off-time entry. |
-| `#floatingActionMenu` & `@keyframes menuPop` | `L186-200` | `position: fixed; z-index: 100`, animated popover anchored near clicked trigger (`L10754-10769`). |
-| `.phone-frame` | `L203-211` | Fixed `340px`-wide iPhone-style bezel framing `#mobileAppPane`. |
+| `.books-sheet-card`, `.books-table`, `.div-sep-right`, `.div-title-cell`, `.col-sub-cell`, `.unit-cell`, `.unit-bid-car` | `index.html` (`L60-129`) | Worksheet grid, division dividers, bid-car emerald highlight (`inset 2.5px 0 0 #10b981`). |
+| `.row-logged-in`, `.row-floated-in`, `.row-floated-out`, `.caret-btn`, `#floatingActionMenu`, `.phone-frame` | `index.html` (`L132-211`) | Logged-in tint, float/RTW pulse highlight, caret menu trigger, popover, `340px` mobile bezel. |
+| `.hb-control-strip`, `.hb-mode-pill`, `.hb-timer-bar-bg/fill` | `css/hireback-engine.css` (`L7-58, L88-100`) | Zero-Touch Hire-Back control strip, notice pills (`active-24plus`, `active-under24`, `active-started`), live timer bars. |
+| `.row-hireback-awarded`, `.row-acting-cod`, `.row-cmd-off` | `css/hireback-engine.css` (`L61-85`) | Emerald Hire-Back award highlight + pulse, amber Acting COD highlight, marked-off command cell tint. |
+| `.backup-dropdown-wrap/menu/item`, `.save-badge-flash` | `css/print-rollcall.css` (`L15-78`) | Backup/Export navbar dropdown menu and `✓ Saved` animation. |
+| `.print-preview-toolbar`, `.print-only-footer`, `body.rollcall-print-preview`, `@media print` | `css/print-rollcall.css` (`L6-12, L84-345`) | Compact 1-page US Letter Landscape print/preview styling (`#printRollCallFooter` footer shown only in print/preview). |
 
 ---
 
-## 4. Top-Level HTML Layout Regions & DOM Element Map (`index.html` L214–647)
+## 4. Top-Level HTML Layout & Runtime-Injected DOM Regions
 
-| Region | Lines | Key DOM IDs & Controls |
+| Region | Source | Key DOM IDs & Controls |
 | :--- | :--- | :--- |
-| **1. Top Navbar (`<header>`)** | `L221-327` | `#shiftHistoryStateBadge` (Live Schedule vs Historical Reflection); `#viewBtn-split`, `#viewBtn-sheet` (`setViewMode`); `#bureauSeg-OPS`, `#bureauSeg-DB` (`selectBureau`); `#scheduleDateInput` + `‹`/`›` (`stepDate`, `handleDateInputChange`); `#shiftSeg-A`, `#shiftSeg-B`, `#shiftSeg-C` (`selectShiftCode`); `#loggedInUserSelect` (`handleUserSwitch`); `#floatScopeSelect` (`citywide` \| `quadrant`, triggers `recalculateFloats()`); `#themeToggleBtn` (`toggleTheme`); Reset (`resetSchedule()`); `#publishHelperBtn` (`openPublishModalAndCopy()`). |
-| **2. Transaction & Contract Stepper Toast** | `L332` | `#transactionToast` — hidden by default; renders red blocked-action alert (with `forceApprovePendingDayOff()` override) or green multi-step contract audit toast + live Automated Hire-Back broadcast bar (`renderToast()`). |
-| **3. Split Workspace Grid** | `L337-638` | Responsive `flex-col 2xl:flex-row` container pairing Left Worksheet + Right Mobile Companion. |
-| **3A. Left: "The Books" Worksheet Card** | `L344-552` | **Header Bar (`L347-396`):** `#sheetMinBanner`, `#sheetMinDot`, `#sheetMinText` (click opens Hire-Back popover), `changeMinimum(-1/1)`, `#demoMinControlVal`, `setMinForVacationDemo()`, `openHireBackPopover(event)`, `#paperScheduleHeadline`, `#paperGuardDutyBanner`, `#paperShiftMin`, `#paperShiftCount`, `#paperSpecialAlertBanner`.<br>**4-Division Spreadsheet (`L401-527`):** `<colgroup>` (`4.3% / 15.2% / 5.5%` × 4 = 12 cols). Division titles `#divTitle-NW/NE/SW/SE` and car counts `#divCount-NW/NE/SW/SE`. Dynamic `<tbody id="paperCommandBody">`, `<tbody id="paperOfficersBody">`.<br>**Bottom Unified Off-Time Grid (`L490-526`):** `#scheduledOffTimeTitle`, 4 category counters `#offColCount-dayOff`, `#offColCount-vacation`, `#offColCount-sickAndLeave`, `#offColCount-trainingAndSpecial`, and `<tbody id="paperScheduledOffTimeBody">`.<br>**Footer Legend (`L532-550`):** Bid Car, Logged-In, Float indicators, and `88 = Off-Duty Time • 87 = On-Duty Time`. |
-| **3B. Right: Companion Mobile App (`#mobileAppPane`)** | `L598-636` | `.phone-frame` (`340px` wide) displaying `#mobileAppShiftBadge` and dynamic `#mobileAppBody` (`renderMobileAppCompanion()`). Synchronized bidirectionally with `app.loggedInPe` and worksheet state. |
-| **4. Bottom 3-Column Analytics & Audit Cards** | `L555-591` | **Card 1 (`L557-567`):** `#floatQueueMiniList` — Next-to-Float PE# Queue (or pause banner when `count < min`).<br>**Card 2 (`L570-579`):** `#hireBackCountBadge`, `#districtCoverageMiniGrid` (14 districts `A–O`), `#hireBackActionBox` (Hire-Back Bid Engine summary & Award button).<br>**Card 3 (`L582-590`):** `#auditMiniList` — Reverse-chronological real-time contract & action log. |
-| **5. Floating Popover Menu** | `L645-647` | `#floatingActionMenu` wrapping `#floatingMenuContent`; shared container used both by `openOfficerActionPopover()` (`ON_DUTY`, `STATIC_OFF`, `DAY_OFF` modes) and `openHireBackPopover()` (Hire-Back bidding + searchable officer database). |
-| **6. Dynamic Publish/Export Modal** | `L12844-12886` | `#publishHelperModal` created dynamically in DOM by `openPublishModalAndCopy()`, containing `#copyStatusBadge`, `#exportRawCodeBox`, and direct GitHub edit/compare links to `macc-dev` and `main`. |
+| **1. Top Navbar (`<header>`)** | `index.html` (`L221-327`) + `persistence-print-export.js` (`L609-686`) | `#shiftHistoryStateBadge`, `#viewBtn-split/sheet`, `#bureauSeg-OPS/DB`, `#scheduleDateInput`, `#shiftSeg-A/B/C`, `#loggedInUserSelect`, `#floatScopeSelect`, `#themeToggleBtn`, injected `#persistenceStatusBadge`, `#printRollCallBtn`, `#backupExportDropdownWrap` (`#backupExportBtn`, `#backupExportMenu`, `#scheduleJsonFileInput`), `resetSchedule()`, `#publishHelperBtn`. |
+| **2. Zero-Touch Hire-Back Strip** | `hireback-engine.js` (`L1501-1697`) | `#hbZeroTouchControlBar` injected directly above `#transactionToast`; renders notice mode pills (`12s` Seniority / `<24h` FCFS / Shift Started + Duty Chief toggle), `ACTING COD` / quadrant sergeant badges, active `HB-*` countdown cards (`#hbTopTimerText-*`, `#hbTopTimerBar-*`), and un-awarded cancellation banners. |
+| **3. Transaction & Contract Toast** | `index.html` (`L332`) | `#transactionToast` — blocked-action alert (with `forceApprovePendingDayOff()`) or 3-step contract audit toast + live Broadcast/Winner bar. |
+| **4. Split Workspace Grid** | `index.html` (`L337-638`) | Left `.books-sheet-card` (`#sheetMinBanner`, `#divTitle-*`, `#divCount-*`, `#paperCommandBody`, `#paperOfficersBody`, `#paperScheduledOffTimeBody`, `#offColCount-*`, injected `#printRollCallFooter`) + Right `#mobileAppPane` (`#mobileAppShiftBadge`, `#mobileAppBody`, injected `#mobileHbLiveCenter`). |
+| **5. Bottom 3-Column Analytics & Audit** | `index.html` (`L555-591`) | `#floatQueueMiniList`, `#hireBackCountBadge`, `#districtCoverageMiniGrid`, `#hireBackActionBox` (enhanced by `renderEnhancedHireBackCard()`), `#auditMiniList`. |
+| **6. Floating Popover & Modals** | `index.html` (`L645-647`) + JS modules | `#floatingActionMenu` / `#floatingMenuContent` (officer, static-off, day-off, command `openCommandActionPopover`, and Hire-Back DB `openHireBackPopover`), injected `#rollCallPrintPreviewToolbar`, dynamic `#publishHelperModal`. |
 
 ---
 
 ## 5. JavaScript Data Layer & Record Schemas (`index.html` L650–10244)
 
-> **Important Architectural Note:** There are **no** constants named `BUREAU_SCHEDULE_KEYS`, `SCHEDULE_KEY_MAP`, `OFF_TIME_STATIC_SHEETS`, `HISTORICAL_SHIFTS`, or `HIREBACK_POOL` (the latter was removed in commit `66f685c`, leaving only one dead reference inside `fillHireBackNow()`). Bureau/date/shift mapping is implemented procedurally in `resolveScheduleTemplate()`, static off-time data is embedded as `offTimeSheet` inside each schedule object, and historical/edited states are cached per-session in `app.savedHistory`.
+> **Important Architectural Note:** There are **no** constants named `BUREAU_SCHEDULE_KEYS`, `SCHEDULE_KEY_MAP`, `OFF_TIME_STATIC_SHEETS`, `HISTORICAL_SHIFTS`, or `HIREBACK_POOL` (`HIREBACK_POOL` was removed in commit `66f685c` and its dead `fillHireBackNow()` reference was removed during `bmac-dev` integration). Bureau/date/shift mapping is implemented procedurally in `resolveScheduleTemplate()`, static off-time data is embedded as `offTimeSheet` inside each schedule object, and historical/edited states are cached per-session in `app.savedHistory` and `localStorage`.
 
 ### 5.1 Core Constants
 
@@ -238,14 +244,24 @@ Array of **290 unique officer/command records** across shifts (`A`: 97, `B`: 103
   - `hireBackBidCounter`: monotonic integer tracking submission order
   - `hireBackLastWinnerNotification`: `null` \| `{ pe, name, shift, assignedUnit, assignedDiv, ruleLabel, timestamp }`
   - `savedHistory`: `Record<string, Snapshot>` keyed by `` `${selectedBureau}_${selectedDate}_${selectedShift}` ``
-- **`hireBackDbState` (`L10952-10956`):** `{ shiftFilter: 'ALL', preferredDiv: null, preferredUnit: null }`
-- **Runtime Enrichments on `app.officers[div][i]` (`loadActiveDateAndShift` L10436-10446 & mutations):**
+- **`app.hbEngine` (`js/hireback-engine.js` `L44-70`):** Modular state subtree persisted inside `localStorage` and `JSON` exports:
+  - `noticeMode`: `'ADVANCE_24PLUS' | 'SHORT_UNDER24' | 'SHIFT_STARTED'`
+  - `dutyChiefAuthorized`: `boolean` (`FOPLC Art. 24 §4D` gate for post-shift-start hire-backs)
+  - `autoSimulateBids`, `timerPaused`: `boolean`
+  - `nextBidId`: monotonic integer (starts `101`, generating `HB-101`, etc.)
+  - `openPostings`: `Array<{ id, kind: 'OFFICER'|'SUPERVISOR', rankRequirement, preferredDiv, slotLabel, scopeLabel, blockType: 'FULL'|'FIRST_4H'|'LAST_4H', noticeMode, secondsRemaining, totalSeconds, status, bids, createdAt }>`
+  - `closedNotifications`: `Array<{ id, postingId, status: 'AWARDED'|'CANCELED_UNAWRD', winner?, notifiedBidders?, canceledRecipients?, ruleSummary, timestamp }>`
+  - `supervisorStandbyList`: sequential callback standby list (`FOPLC Art. 24 §4B`)
+  - `commandOffRoster`: marked-off supervisors `{ pe, name, rank, origUnit, origDiv, status, fullLabel, shortCode, time }`
+  - `actingCodInfo`: `null | { name, pe, unit, div }` (`FOPLC Art. 24 §2A & Art. 25` senior Sgt Acting COD)
+- **`hireBackDbState` (`index.html` `L10952-10956`):** `{ shiftFilter: 'ALL', preferredDiv: null, preferredUnit: null }`
+- **Runtime Enrichments on `app.officers[div][i]` (`loadActiveDateAndShift` `L10436-10446` & mutations):**
   - `district` (`parseDistrict(row.unit)`), `homeName`, `homePe`, `homePartner`, `isHireBack`, `isReturnedOffTime`, `returnedMeta`, `hireBackShift`, `floatedFrom` (`{ unit, div }` \| `null`), `floatedTo` (`{ unit, div, name, pe }` \| `null`).
 
 ### 6.2 Snapshot Persistence (`saveCurrentShiftSnapshot` & `loadActiveDateAndShift`)
 
 - Before any bureau, date, or shift change (`stepDate`, `handleDateInputChange`, `selectBureau`, `selectShiftCode`, `switchSchedule`), `saveCurrentShiftSnapshot()` (`L10345-10360`) deep-clones the current state (`shiftMin`, `command`, `officers`, `offTimeSheet`, `dayOffRoster`, `floatedMoves`, `hireBackBids`, `hireBackBidCounter`, `hireBackLastWinnerNotification`, `auditEntries`) into `app.savedHistory[key]`.
-- `renderAll()` (`L11947`) also writes a snapshot on every render pass.
+- `renderAll()` (`L11941-11946`) writes `app.savedHistory[key]` on every render pass, while `persistence-print-export.js` Layer 2 wraps `renderAll()` to update `#printRollCallFooter` and persist complete state (including `hbEngine`) to `localStorage`.
 - `loadActiveDateAndShift(targetOfficerPe)` (`L10411-10478`) restores from `app.savedHistory[key]` if present, or instantiates a fresh clone from `resolveScheduleTemplate(selectedDate, selectedShift)`. Dates `< '2026-11-15'` are tagged `Historical Reflection` (`ARCHIVE`).
 
 ---
@@ -257,7 +273,7 @@ Array of **290 unique officer/command records** across shifts (`A`: 97, `B`: 103
 ```mermaid
 flowchart TD
     UI["User Action: Caret Menu / Mobile App / Navbar / Hire-Back Popover"] --> NAV{"Navigation?"}
-    NAV -->|Yes| SAVE["saveCurrentShiftSnapshot()"] --> LOAD["loadActiveDateAndShift()"] --> RENDER["renderAll()"]
+    NAV -->|Yes| SAVE["saveCurrentShiftSnapshot()"] --> LOAD["loadActiveDateAndShift()"] --> SYNC_MOD["checkAndCreatePostings + auditSupervisorMinimums"] --> RENDER["renderAll()"]
     NAV -->|No: Mutation| ACT{"Action Type"}
     ACT -->|Mark Off / Leave| CHK{"requiresAboveMin & count <= min?"}
     CHK -->|Yes| BLK["Set app.toastData = blocked"] --> RENDER
@@ -265,83 +281,85 @@ flowchart TD
     ACT -->|RTW / Hire-Back| SLOT["findTargetOpenSlotForReturnOrHireBack()"] --> PLACE["Assign Slot + isHireBack/isReturnedOffTime"] --> FLT
     ACT -->|Restore / Cancel| CLR["Restore homeUnit or clear temp flags"] --> FLT
     FLT --> GUARD{"count >= shiftMin?"}
-    GUARD -->|No| PAUSE["Pause Floating (keep roles intact; hold slot for HB)"] --> RENDER
-    GUARD -->|Yes| RUN["Float lowest-seniority (highest PE#) eligible car into 0-car districts"] --> RENDER
-    RENDER --> SUB["renderToast + Command + Officers + OffTime + MobileApp + BottomPanels + saveCurrentShiftSnapshot()"]
+    GUARD -->|No| PAUSE["Pause Floating (keep roles intact; hold slot for HB)"] --> SYNC_MOD
+    GUARD -->|Yes| RUN["Float lowest-seniority (highest PE#) eligible car into 0-car districts"] --> SYNC_MOD
+    RENDER --> SUB["renderToast + Command + Officers + OffTime + MobileApp + BottomPanels + Layer1/Layer2 (ControlStrip, Footer, localStorage)"]
 ```
 
-### 7.2 Subsystem Function Inventory (Exact Line Ranges)
+### 7.2 Core Engine Inventory (`index.html` `L10270-12893`)
 
 1. **Bureau / Date / Shift Navigation & Utilities (`L10270-10597`):**
-   - `clone(o)` (`L10270-10272`) — JSON deep clone helper.
-   - `parseDistrict(unitStr)` (`L10274-10279`) — extracts leading `[A-O]` district letter, explicitly excluding `K9*` (`return ''`).
-   - `parseStaticOffTimeString(rawStr, colKey, idx)` (`L10281-10302`) — regex parser for off-time text rows.
-   - `formatLongDate(isoDate)` (`L10304-10313`), `formatShortDate(isoDate)` (`L10315-10323`).
-   - `resolveScheduleTemplate(isoDate, shiftCode)` (`L10325-10343`) — if `selectedBureau === 'DB'`, returns `DB_C` (`shiftCode === 'C'`) or `DB_FLEX`; if `OPS`, matches `2026-11-15`/`16`/`17` explicitly, otherwise falls back to odd/even day parity (`A_11_17` vs `A_11_15`), `B_11_16`, or `C_11_15`.
-   - `saveCurrentShiftSnapshot()` (`L10345-10360`), `stepDate(deltaDays)` (`L10362-10373`), `handleDateInputChange(newDateVal)` (`L10375-10380`), `selectBureau(bureauCode)` (`L10382-10386`), `selectShiftCode(shiftCode, targetOfficerPe)` (`L10388-10392`), `switchSchedule(schedId, targetOfficerPe)` (`L10394-10409`), `loadActiveDateAndShift(targetOfficerPe)` (`L10411-10478`), `initApp()` (`L10480-10484`).
-   - `populateUserSelect()` (`L10486-10553`), `handleUserSwitch(overridePe)` (`L10555-10575`), `setViewMode(mode)` (`L10577-10591`), `toggleTheme()` (`L10593-10597`).
+   - `clone(o)` (`L10270-10272`), `parseDistrict(unitStr)` (`L10274-10279`, excludes `K9*`), `parseStaticOffTimeString()` (`L10281-10302`), `formatLongDate()` (`L10304-10313`), `formatShortDate()` (`L10315-10323`).
+   - `resolveScheduleTemplate(isoDate, shiftCode)` (`L10325-10343`) — resolves `DB_C` / `DB_FLEX` for `'DB'`, or `OPS` `2026-11-15`/`16`/`17` with odd/even `A`-shift fallback.
+   - `saveCurrentShiftSnapshot()`, `stepDate()`, `handleDateInputChange()`, `selectBureau()`, `selectShiftCode()`, `switchSchedule()`, `loadActiveDateAndShift()`, `initApp()` (`L10345-10484`).
+   - `populateUserSelect()`, `handleUserSwitch()`, `setViewMode()`, `toggleTheme()` (`L10486-10597`).
 
 2. **Staffing Count, District Coverage & Lookup (`L10599-10647`):**
-   - `findOfficerByPe(peNum)` (`L10599-10624`) — resolves an officer across 4 states in priority order: `'ON_DUTY'` (`app.officers`), `'DAY_OFF'` (`app.dayOffRoster`), `'STATIC_OFF'` (`app.offTimeSheet`), or `'OTHER_SHIFT'` (`MASTER_OPERATIONS_DIRECTORY`).
-   - `getShiftCount()` (`L10626-10634`) — counts all rows across `DIV_KEYS` where `r.name && r.pe !== null`.
-   - `getDistrictCounts()` (`L10636-10647`) — initializes all 14 districts in `DIV_DISTRICTS` to `0`, then increments for occupied rows with non-empty `r.district`.
+   - `findOfficerByPe(peNum)` (`L10599-10624`) — checks `'ON_DUTY'` → `'DAY_OFF'` → `'STATIC_OFF'` → `'OTHER_SHIFT'`.
+   - `getShiftCount()` (`L10626-10634`), `getDistrictCounts()` (`L10636-10647`).
 
 3. **Core Float Engine (`recalculateFloats`, `L10655-10749`):**
-   - Phase 1 (`L10656-10675`): Deterministic reset — clears `floatedFrom`, `floatedTo`, and `app.floatedMoves`; skips `isHireBack` and `isReturnedOffTime` rows; empties rows whose `unit` is in `app.dayOffRoster[div]`, otherwise restores `homeName`/`homePe`/`homePartner`.
-   - Phase 2 Guard (`L10679`): **Below-minimum pause guard** — `if (currentCount >= app.shiftMin)` is required before any floating occurs. When below minimum, all on-duty officers stay in their normal assignments so an awarded Hire-Back officer fills the vacated slot directly.
-   - Phase 3 Iterative District Fill (`L10680-10745`): Iterates `DIV_KEYS` × `DIV_DISTRICTS[div]`. Whenever `distCounts[dist] === 0`:
-     - Picks target slot in priority: vacated day-off car in `dist` → open non-bid car in `dist` → any open car in `dist`.
-     - Collects eligible donors across `DIV_KEYS` rejecting empty rows, `r.bidCar === true`, and `distCounts[r.district] <= 1` (sole-district-car guard).
-     - Sorts candidates: if `floatScopeSelect === 'quadrant'`, prefers `a.div === div` first; then sorts by `b.row.pe - a.row.pe` (highest PE# / lowest seniority first).
-     - Moves top candidate to `targetRow`, records `floatedFrom`, `floatedTo`, `app.floatedMoves`, and refreshes `distCounts`.
-   - Ends with `populateUserSelect()` and `renderAll()`.
+   - Phase 1 (`L10656-10675`): Deterministic reset preserving `isHireBack` and `isReturnedOffTime` rows.
+   - Phase 2 Guard (`L10679`): **Below-minimum pause guard** (`if (currentCount >= app.shiftMin)`).
+   - Phase 3 Iterative District Fill (`L10680-10745`): Fills `0`-car districts preferring vacated day-off unit → open non-bid car → open car, floating eligible donors (`bidCar !== true`, `distCounts[r.district] > 1`) in `quadrant` or `citywide` scope by highest `PE#` first; calls `populateUserSelect()` and `renderAll()`.
 
 4. **Leave, Return-to-Work & Off-Time Management (`L10754-10947`, `L11336-11824`):**
-   - Popover UI: `positionPopoverNearEvent()` (`L10754-10769`), `openOfficerActionPopover(event, mode, divOrCol, unitOrIdx)` (`L10771-10947`, handles `'ON_DUTY'`, `'STATIC_OFF'`, `'DAY_OFF'`), `closeActionPopover()` (`L11336-11339`), `triggerLeaveAction()` (`L11341-11344`).
-   - Officer Status & Leave: `handleOfficerStatusSelect()` (`L11607-11662`, handles `CODE_88`, `CODE_87`, min-count hold toast, or execution), `forceApprovePendingDayOff()` (`L11664-11671`), `executeApprovedLeaveMove()` (`L11673-11750`, moves temp or permanent officer off-duty, recalculates floats, triggers `ensureAutomatedHireBackBroadcast()` if `countAfter < shiftMin`, writes toast + audit).
-   - Restore & Static Off-Time: `restoreOfficerFromDayOff()` (`L11752-11783`, clears temporary HB/RTW flags if someone filled the home car), `handleDayOffActionSelect()` (`L11785-11801`), `returnStaticOfficerToWork()` (`L11449-11489`), `moveStaticOffTimeOfficer()` (`L11491-11502`), `cancelTemporaryDutyRow()` (`L11504-11536`).
-   - Demo / Min Controls: `changeMinimum(delta)` (`L11803-11806`), `setMinForVacationDemo()` (`L11808-11818`), `resetSchedule()` (`L11820-11824`).
+   - Popover UI: `positionPopoverNearEvent()`, `openOfficerActionPopover()`, `closeActionPopover()`, `triggerLeaveAction()`.
+   - Leave & Restore: `handleOfficerStatusSelect()`, `forceApprovePendingDayOff()`, `executeApprovedLeaveMove()`, `restoreOfficerFromDayOff()`, `handleDayOffActionSelect()`, `returnStaticOfficerToWork()`, `moveStaticOffTimeOfficer()`, `cancelTemporaryDutyRow()`.
+   - Controls (`L11803-11824`): `changeMinimum(delta)` (`L11803-11806`) & `setMinForVacationDemo()` (`L11808-11818`) both invoke `recalculateFloats()`; `resetSchedule()` (`L11820-11824`).
 
-5. **Automated Hire-Back Notification, Opt-In, Search & Bidding Engine (`L10952-11605`):**
-   - Opt-In & Mode: `isOfficerOptedInForHireBack(pe)` (`L10958-10960`), `toggleOfficerHireBackOptIn(pe, officerName)` (`L10962-10984`), `setHireBackNoticeMode(mode)` (`L10986-10992`).
-   - Broadcast & Ranking: `ensureAutomatedHireBackBroadcast()` (`L10994-11025`, filters out on-duty PEs; seeds `#1997`, `#2013`, `#1689` if empty when `count < min`), `getSortedHireBackBids()` (`L11027-11041`: `bidOrder` ascending for `FCFS_UNDER_24HR`, `pe` ascending for `SENIORITY_24HR`), `submitOfficerHireBackBid()` (`L11043-11084`), `autoAwardWinningHireBackBid()` (`L11086-11103`).
-   - Searchable Database Popover: `openHireBackPopover()` (`L11105-11150`), `renderHireBackPopoverSections()` (`L11152-11225`), `setHireBackShiftFilter()` (`L11227-11230`), `renderHireBackDatabaseResults()` (`L11232-11334` — deduplicates `MASTER_OPERATIONS_DIRECTORY`, excludes `COMMAND` and active on-duty PEs, sorts by `pe` ascending, filters by `A | B | C | ALL` + text query).
-   - Slot Resolution & Award: `findTargetOpenSlotForReturnOrHireBack()` (`L11400-11446`), `awardCrossShiftHireBack()` (`L11538-11605` — places winner directly, runs `recalculateFloats()`, clears bid pool if `countAfter >= shiftMin`, sets `app.hireBackLastWinnerNotification`, switches `app.loggedInPe = pe`, writes toast + audit).
+5. **Automated Hire-Back Registry, Search DB & Bidding (`L10952-11605`):**
+   - Opt-In & Ranking: `isOfficerOptedInForHireBack()`, `toggleOfficerHireBackOptIn()`, `setHireBackNoticeMode()`, `ensureAutomatedHireBackBroadcast()`, `getSortedHireBackBids()`, `submitOfficerHireBackBid()`, `autoAwardWinningHireBackBid()`.
+   - Searchable Popover (`L11105-11334`): `openHireBackPopover()`, `renderHireBackPopoverSections()`, `setHireBackShiftFilter()`, `renderHireBackDatabaseResults()` (`A | B | C | ALL`, excludes `COMMAND` and on-duty PEs, sorted by `pe` asc).
+   - Slot Resolution & Award: `findTargetOpenSlotForReturnOrHireBack()` (`L11400-11446`), `awardCrossShiftHireBack()` (`L11538-11605`).
 
-6. **Rendering Pipeline (`L11835-12762`):**
-   - `renderAll()` (`L11835-11955`): updates metrics, status pill, bureau/shift active classes, date/history badge, dynamic column headers (`colHeaders`), headlines, saves snapshot, and invokes:
-     - `renderToast()` (`L11957-12034`)
-     - `renderPaperCommandRows()` (`L12039-12069`)
-     - `renderPaperOfficerRows()` (`L12074-12169`)
-     - `renderPaperScheduledOffTimeRows()` (`L12236-12297`) via `inferOffTimeCategory()` (`L12174-12181`), `formatStaticOffTimeEntry()` (`L12183-12216`), `formatDynamicMarkedOffEntry()` (`L12218-12234`)
-     - `renderMobileAppCompanion(count, min)` (`L12302-12638`)
-     - `renderBottomPanels(count, min)` (`L12643-12762`)
+6. **Rendering Pipeline (`L11829-12750`):**
+   - `renderAll()` (`L11829-11949`) updates banners/counts/headers, saves snapshot, and invokes:
+     - `renderToast()` (`L11951-12028`)
+     - `renderPaperCommandRows()` (`L12033-12063`)
+     - `renderPaperOfficerRows()` (`L12068-12163`)
+     - `renderPaperScheduledOffTimeRows()` (`L12230-12291`) via `inferOffTimeCategory()` (`L12168-12175`), `formatStaticOffTimeEntry()` (`L12177-12210`), `formatDynamicMarkedOffEntry()` (`L12212-12228`)
+     - `renderMobileAppCompanion(count, min)` (`L12296-12632` — mobile quick-switch buttons invoke `handleUserSwitch('1883'|'1586'|'1997')` at `L12325-12333`)
+     - `renderBottomPanels(count, min)` (`L12637-12750`)
 
-7. **Standalone Export / Publish Helper (`L12764-12888`):**
-   - `buildStandaloneReleaseHtml()` (`L12764-12779`), `copyReleaseHtmlToClipboard()` (`L12781-12812`), `fallbackCopy()` (`L12814-12826`), `downloadReleaseHtmlFile()` (`L12828-12839`), `openPublishModalAndCopy()` (`L12841-12888`).
+7. **Standalone Export / Publish Helper (`L12752-12891`):**
+   - `buildStandaloneReleaseHtml()` (`L12758-12782`), `copyReleaseHtmlToClipboard()` (`L12784-12815`), `fallbackCopy()` (`L12817-12829`), `downloadReleaseHtmlFile()` (`L12831-12842`), `openPublishModalAndCopy()` (`L12844-12891`).
+
+### 7.3 Zero-Touch Hire-Back Engine (`js/hireback-engine.js`, `2,444` lines — Layer 1)
+
+Wrapped in an IIFE exposing UI controls onto `window` and attaching Layer 1 wrappers inside `hookHireBackEngine()` (`L2133-2444`):
+- **Sections `1–3` (`L16-119`):** `EXTENDED_CANDIDATE_POOL` (off-duty Ops Patrol, DB Detectives, Exempt/Narcotics, LTs/Sgts), `BID_WINDOW_SECONDS = 12`, `FCFS_AUTO_FILL_SECONDS = 4`, `ensureEngineState()` (exposes `window.app = app`), `getNoticeModeDetails()`.
+- **Sections `4–5` (`L120-359`):** `evaluateBidderEligibility()` (`L158-214`, blocks `dayOffRoster` / `commandOffRoster` self-mark-offs per `PBA Art. 35 §4` and sick/light-duty members per `FOPLC Art. 26`), `sortBidsForPosting()` (`L216-246`, Uniform division priority in `≥24h`), and `auditSupervisorMinimums()` (`L251-357`, `FOPLC Art. 24 §2` / `Art. 25` auto-elevation of senior Sgt to `ACTING COD` and `SUPERVISOR` Hire-Back triggering).
+- **Sections `6–9` (`L360-1102`):** `createHireBackPosting()`, `syncAppHireBackBidsIntoPosting()`, `scheduleSimulatedBidsForPosting()`, `submitBidToPosting()`, `finalizeHireBackAward()`, `splitUnfilledPostingIntoPartialBlocks()`, `cancelUnAwardedPostings()` + `buildOptedInCancellationRecipients()` (`L844-980`, notifies all `app.hireBackOptInPes` & bidders when shortages resolve before award), `checkAndCreatePostingsForCurrentShortages()`, and 1-second `ensureTimerRunning()` timer tick loop.
+- **Sections `10–13` (`L1104-2051`):** `openCommandActionPopover()`, `triggerCommandLeaveAction()`, `restoreSupervisorToDuty()`, `triggerCShiftTrainingLeave()` (`L1266-1302`), `setHbNoticeMode()`, `toggleDutyChiefAuth()`, `expirePostingNow()`, `simulateFirstBidderClaimNow()`, `returnOfficerToCancelHireBack()`, `splitPostingToPartialsNow()`, `userBidOrClaimPosting()`, plus UI renderers (`#hbZeroTouchControlBar`, `.row-acting-cod` / `.row-cmd-off`, enhanced `#hireBackActionBox`, `#mobileHbLiveCenter`).
+- **Section `14` Hook Chain (`L2053-2444`):** Wraps `executeApprovedLeaveMove`, `restoreOfficerFromDayOff`, `returnStaticOfficerToWork`, `cancelTemporaryDutyRow` (plus fallback `removeHireBackOfficer`), `awardCrossShiftHireBack` (`closeMatchedOfficerPostingFromManualAward` closes open `OFFICER` postings on manual award and preserves award toast), `ensureAutomatedHireBackBroadcast` (`0`-bid suppression in `SHORT_UNDER24`/`SHIFT_STARTED`), `submitOfficerHireBackBid` (pre-checks `evaluateBidderEligibility` before instant FCFS claim), `setHireBackNoticeMode`, `changeMinimum`, `setMinForVacationDemo`, `openOfficerActionPopover` (`C`-shift training option), `loadActiveDateAndShift`, and `renderAll`.
+
+### 7.4 Persistence, Print & Export Engine (`js/persistence-print-export.js`, `788` lines — Layer 2)
+
+Wrapped in an IIFE loading after `js/hireback-engine.js`, attaching Layer 2 wrappers inside `hookGlobalFunctions()` (`L689-768`):
+- **Section `1` (`L13-205`):** `serializeState()`, `saveStateToStorage()`, `applyStatePayload()`, `restoreStateFromStorage()` under `STORAGE_KEY = 'fwpd_the_books_state_v3_0_unified'`, plus `#persistenceStatusBadge`.
+- **Section `2` (`L207-418`):** `triggerRollCallPrint()`, `updatePrintFooter()` (live A–O counts, float moves, legend, COD signature), `exitRollCallPrintPreview()`, and `downloadPrintableRollCallHtml()` (dynamic bureau/shift/date title & filename).
+- **Section `3` (`L420-594`):** `exportScheduleJson()`, `handleImportJsonFile()`, `exportRosterCsv()`, and `exportAuditCsv()` with dynamic active bureau/shift/date filenames.
+- **Section `4` (`L596-787`):** `injectNavbarControls()` (adds `#persistenceStatusBadge`, `#printRollCallBtn`, `#backupExportDropdownWrap`) and `hookGlobalFunctions()` (outer wrappers on `renderAll`, `toggleTheme`, `setViewMode`, `restoreOfficerFromDayOff`, `resetSchedule`, and `buildStandaloneReleaseHtml`).
 
 ---
 
 ## 8. Technical Debt, Known Defects & Fragility Warnings
 
-Downstream engineering agents modifying `index.html` must be aware of the following verified issues (do not silently break surrounding behavior):
+Downstream engineering agents modifying `index.html`, `js/`, or `css/` must account for the following verified constraints and remaining items:
 
-1. **Broken Quick-Switcher Calls in Mobile Preview (`L12331`, `L12334`, `L12337`):**
-   - Inside `renderMobileAppCompanion()`, the 3 quick-switcher pills (`Maurer #1883`, `Engelman #1586`, `Aguilera #1997`) call `onclick="switchUserRole('...')"`.
-   - `switchUserRole` is **undefined** anywhere in `index.html`; clicking any of those 3 buttons throws `ReferenceError: switchUserRole is not defined`. The working user switcher function is `handleUserSwitch(overridePe)` (`L10555`).
-2. **Dead Code `fillHireBackNow()` Referencing Removed `HIREBACK_POOL` (`L11826-11830`):**
-   - `fillHireBackNow(candIdx)` references `HIREBACK_POOL[candIdx]`, which was removed when the Quick Award section was replaced by the searchable `MASTER_OPERATIONS_DIRECTORY` database (commit `66f685c`). It is unreferenced in UI templates and will throw if called.
-3. **Dual Tailwind Script Tags in `<head>` (`L7-8`):**
+1. **Dual Tailwind Script Tags in `<head>` (`index.html` `L7-8`):**
    - Both `<script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>` (L7) and `<script src="https://cdn.tailwindcss.com"></script>` (L8) are loaded. Removing either without testing across both Antigravity preview and GitHub Pages could alter utility class rendering.
-4. **K-9 District Exclusion Side Effect (`L10277`, `L10626-10634`, `L10698`, `L12651`):**
+2. **K-9 District Exclusion Side Effect (`index.html` `L10277`, `L10626-10634`, `L10698`, `L12645`):**
    - `parseDistrict('K9-3')` returns `''` (`L10277`). Because `distCounts['']` is `undefined`, the sole-district check `distCounts[r.district] <= 1` evaluates `undefined <= 1` → `false` in JavaScript. As a result, in `C_11_15` (where 3 K-9 rows are occupied), K-9 officers are counted by `getShiftCount()` and are not excluded from float candidate lists (`recalculateFloats` and `renderBottomPanels`), contrary to PBA Art. 23 §8.
-5. **Hardcoded Row Loop Count (`31`) and Footer Date (`11/14/2026`) (`L12078`, `L12141-12143`):**
+3. **Hardcoded Row Loop Count (`31`) and Footer Date (`11/14/2026`) (`index.html` `L12072`, `L12136`):**
    - `renderPaperOfficerRows()` loops `for (let i = 0; i < 31; i++)` even on `DB_FLEX` and `DB_C` (which have 27 officer rows per column, rendering 4 blank trailing rows), and prints literal `11/14/2026` at `i === 30 && div === 'NW'` instead of reading `sched.footerDate`.
-6. **Direct `ALL_SCHEDULES[app.activeScheduleId]` Lookup in Mobile Renderer (`L12466`):**
+4. **Direct `ALL_SCHEDULES[app.activeScheduleId]` Lookup in Mobile Renderer (`index.html` `L12460`):**
    - `renderMobileAppCompanion()` accesses `ALL_SCHEDULES[app.activeScheduleId].shiftCode` and `.shiftHours` directly (relying on `Object.assign(ALL_SCHEDULES, DB_SCHEDULES)` at `L7626`), whereas `renderAll()` uses `resolveScheduleTemplate()`.
-7. **`resetSchedule()` Hardcodes `app.shiftMin = 32` Before `initApp()` (`L11820-11824`):**
-   - `resetSchedule()` sets `app.shiftMin = 32` before calling `initApp()`, which then overwrites `app.shiftMin = tmpl.shiftMin`. Also `initApp()` only deletes the *currently selected* key from `app.savedHistory`, preserving other cached shifts/dates until page reload.
-8. **`setViewMode()` Button Class Drift (`L10584-10589` vs `L242-247`):**
+5. **`resetSchedule()` Hardcodes `app.shiftMin = 32` Before `initApp()` (`index.html` `L11820-11824`):**
+   - `resetSchedule()` sets `app.shiftMin = 32` before calling `initApp()`, which then overwrites `app.shiftMin = tmpl.shiftMin`. Also `initApp()` only deletes the *currently selected* key from `app.savedHistory`, preserving other cached shifts/dates in memory while `persistence-print-export.js` clears `localStorage`.
+6. **`setViewMode()` Button Class Drift (`index.html` `L10577-10591` vs `L242-247`):**
    - Initial HTML uses `px-2.5 py-1 rounded-md`, whereas `setViewMode()` overwrites `className` with `px-3 py-1.5 rounded-lg`.
-9. **Inline `<script>` Global Scope & Release HTML Strip Coupling (`L12764-12779`):**
-   - All 66 functions are global functions called by inline `onclick`/`onchange`/`oninput` strings; `buildStandaloneReleaseHtml()` explicitly relies on `#publishHelperBtn`, `#publishHelperModal`, `#transactionToast`, `#floatingActionMenu`, and `--bg-app` inside `<head> <style>`.
+7. **Global Hook & Wrapper Load-Order Coupling (`index.html` `L12758-12899`):**
+   - All inline `<script>` helpers execute first (`initApp()`), then `js/hireback-engine.js` (Layer 1) wraps `window.*` functions and exposes lexical `let app` via `window.app`, and finally `js/persistence-print-export.js` (Layer 2) wraps outer `renderAll`, `restoreOfficerFromDayOff`, `resetSchedule`, and `buildStandaloneReleaseHtml`. Changing `<script>` order at `L12898-12899` or renaming wrapped global functions silently breaks auto-save, print footer updates, or shortage synchronization.
+   - `buildStandaloneReleaseHtml()` (`L12758-12782`) depends explicitly on `--bg-app` inside `<head> <style>` and the exact IDs of runtime-injected DOM nodes (`#publishHelperBtn`, `#publishHelperModal`, `#hbZeroTouchControlBar`, `#persistenceStatusBadge`, `#printRollCallBtn`, `#backupExportDropdownWrap`, `#printRollCallFooter`, `#rollCallPrintPreviewToolbar`, `#hbBidderNotificationModal`, `#mobileHbLiveCenter`) so standalone HTML downloads re-initialize cleanly.

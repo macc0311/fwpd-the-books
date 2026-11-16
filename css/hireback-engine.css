@@ -1,0 +1,113 @@
+/**
+ * FWPD "The Books" — Zero-Touch Hire-Back & Overtime Bidding Engine Styles
+ * Implements PBA Article 35 & FOPLC Articles 24, 25, 26 visual indicators
+ */
+
+/* Hire-Back Control Bar in Worksheet Header / Subheader */
+.hb-control-strip {
+  background: linear-gradient(90deg, rgba(15, 23, 42, 0.97) 0%, rgba(30, 41, 59, 0.97) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: 14px;
+  padding: 10px 14px;
+  color: #f8fafc;
+  box-shadow: 0 8px 20px -6px rgba(15, 23, 42, 0.25);
+}
+
+.hb-mode-pill {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hb-mode-pill.active-24plus {
+  background-color: rgba(37, 99, 235, 0.25);
+  border-color: #3b82f6;
+  color: #93c5fd;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+}
+
+.hb-mode-pill.active-under24 {
+  background-color: rgba(245, 158, 11, 0.25);
+  border-color: #f59e0b;
+  color: #fde68a;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+}
+
+.hb-mode-pill.active-started {
+  background-color: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
+.hb-mode-pill.inactive {
+  background-color: rgba(30, 41, 59, 0.8);
+  border-color: rgba(71, 85, 105, 0.6);
+  color: #94a3b8;
+}
+
+.hb-mode-pill.inactive:hover {
+  color: #f8fafc;
+  border-color: #64748b;
+}
+
+/* Worksheet Row Highlights for Auto-Awarded Hire-Backs & Acting COD */
+.row-hireback-awarded {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  box-shadow: inset 3px 0 0 #10b981;
+  animation: hbAwardPulse 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.row-acting-cod {
+  background-color: rgba(245, 158, 11, 0.18) !important;
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
+
+.row-cmd-off {
+  background-color: var(--dayoff-bg) !important;
+  color: var(--dayoff-text) !important;
+}
+
+@keyframes hbAwardPulse {
+  0% {
+    transform: scale(1.01);
+    background-color: rgba(16, 185, 129, 0.38);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Countdown Progress Bar for >24h Bid Collection Window */
+.hb-timer-bar-bg {
+  width: 100%;
+  height: 5px;
+  background-color: rgba(51, 65, 85, 0.7);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.hb-timer-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #10b981);
+  transition: width 0.35s linear;
+}
+
+/* Hide Hire-Back interactive controls during 1-Page Roll Call Print */
+@media print {
+  #hbZeroTouchControlBar,
+  #hbBidderNotificationModal {
+    display: none !important;
+  }
+}
+
+body.rollcall-print-preview #hbZeroTouchControlBar,
+body.rollcall-print-preview #hbBidderNotificationModal {
+  display: none !important;
+}
