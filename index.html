@@ -10648,6 +10648,9 @@
 
     // =========================================================================
     // CORE FLOAT ENGINE (Deterministic Reset + Inverse PE# Seniority Float)
+    // Note: No floating occurs when Shift Count < Shift Minimum, because the
+    // incoming Hire-Back officer fills the vacated role directly without
+    // displacing another officer out of their normal assignment.
     // =========================================================================
     function recalculateFloats() {
       for (const div of DIV_KEYS) {
@@ -10669,67 +10672,73 @@
       }
 
       app.floatedMoves = [];
-      let distCounts = getDistrictCounts();
-      const scope = document.getElementById('floatScopeSelect')?.value || 'citywide';
+      const currentCount = getShiftCount();
 
-      for (const div of DIV_KEYS) {
-        for (const dist of DIV_DISTRICTS[div]) {
-          if (distCounts[dist] === 0) {
-            const vacatedUnits = app.dayOffRoster[div].map(x => x.homeUnit);
-            let targetRow = app.officers[div].find(r => r.district === dist && vacatedUnits.includes(r.unit) && !r.name)
-                         || app.officers[div].find(r => r.district === dist && !r.bidCar && !r.name)
-                         || app.officers[div].find(r => r.district === dist && !r.name);
+      // Do NOT float officers out of their normal assignments when below minimum;
+      // the awarded Hire-Back officer will fill the open assignment directly.
+      if (currentCount >= app.shiftMin) {
+        let distCounts = getDistrictCounts();
+        const scope = document.getElementById('floatScopeSelect')?.value || 'citywide';
 
-            if (!targetRow) continue;
+        for (const div of DIV_KEYS) {
+          for (const dist of DIV_DISTRICTS[div]) {
+            if (distCounts[dist] === 0) {
+              const vacatedUnits = app.dayOffRoster[div].map(x => x.homeUnit);
+              let targetRow = app.officers[div].find(r => r.district === dist && vacatedUnits.includes(r.unit) && !r.name)
+                           || app.officers[div].find(r => r.district === dist && !r.bidCar && !r.name)
+                           || app.officers[div].find(r => r.district === dist && !r.name);
 
-            const candidates = [];
-            for (const cDiv of DIV_KEYS) {
-              for (const r of app.officers[cDiv]) {
-                if (!r.name || r.pe === null) continue;
-                if (r.bidCar) continue;
-                if (distCounts[r.district] <= 1) continue;
-                candidates.push({ row: r, div: cDiv });
-              }
-            }
+              if (!targetRow) continue;
 
-            if (candidates.length > 0) {
-              candidates.sort((a, b) => {
-                if (scope === 'quadrant') {
-                  const aSame = a.div === div ? 0 : 1;
-                  const bSame = b.div === div ? 0 : 1;
-                  if (aSame !== bSame) return aSame - bSame;
+              const candidates = [];
+              for (const cDiv of DIV_KEYS) {
+                for (const r of app.officers[cDiv]) {
+                  if (!r.name || r.pe === null) continue;
+                  if (r.bidCar) continue;
+                  if (distCounts[r.district] <= 1) continue;
+                  candidates.push({ row: r, div: cDiv });
                 }
-                return b.row.pe - a.row.pe;
-              });
+              }
 
-              const winner = candidates[0];
-              const movedName = winner.row.name;
-              const movedPe = winner.row.pe;
-              const movedPartner = winner.row.partner || '';
-              const fromUnit = winner.row.unit;
-              const fromDiv = winner.div;
+              if (candidates.length > 0) {
+                candidates.sort((a, b) => {
+                  if (scope === 'quadrant') {
+                    const aSame = a.div === div ? 0 : 1;
+                    const bSame = b.div === div ? 0 : 1;
+                    if (aSame !== bSame) return aSame - bSame;
+                  }
+                  return b.row.pe - a.row.pe;
+                });
 
-              targetRow.name = movedName;
-              targetRow.pe = movedPe;
-              targetRow.partner = movedPartner;
-              targetRow.floatedFrom = { unit: fromUnit, div: fromDiv };
+                const winner = candidates[0];
+                const movedName = winner.row.name;
+                const movedPe = winner.row.pe;
+                const movedPartner = winner.row.partner || '';
+                const fromUnit = winner.row.unit;
+                const fromDiv = winner.div;
 
-              winner.row.name = '';
-              winner.row.pe = null;
-              winner.row.partner = '';
-              winner.row.floatedTo = { unit: targetRow.unit, div, name: movedName, pe: movedPe };
+                targetRow.name = movedName;
+                targetRow.pe = movedPe;
+                targetRow.partner = movedPartner;
+                targetRow.floatedFrom = { unit: fromUnit, div: fromDiv };
 
-              app.floatedMoves.push({
-                name: movedName,
-                pe: movedPe,
-                fromUnit,
-                fromDiv,
-                toUnit: targetRow.unit,
-                toDiv: div,
-                district: dist
-              });
+                winner.row.name = '';
+                winner.row.pe = null;
+                winner.row.partner = '';
+                winner.row.floatedTo = { unit: targetRow.unit, div, name: movedName, pe: movedPe };
 
-              distCounts = getDistrictCounts();
+                app.floatedMoves.push({
+                  name: movedName,
+                  pe: movedPe,
+                  fromUnit,
+                  fromDiv,
+                  toUnit: targetRow.unit,
+                  toDiv: div,
+                  district: dist
+                });
+
+                distCounts = getDistrictCounts();
+              }
             }
           }
         }
@@ -11401,8 +11410,28 @@
           if (homeSlot) return { div: known.div, row: homeSlot };
         }
       }
-      // Prefer a car slot that was floated out (so filling it covers the open car)
       const searchDivs = preferredDiv ? [preferredDiv, ...DIV_KEYS.filter(d => d !== preferredDiv)] : DIV_KEYS;
+      const distCounts = getDistrictCounts();
+
+      // Priority 1: Fill a car vacated by an officer who marked off (starting with any uncovered district = 0 cars)
+      for (const div of searchDivs) {
+        const vacatedUnits = (app.dayOffRoster[div] || []).map(x => x.homeUnit);
+        const vacatedUncovered = app.officers[div].find(r => vacatedUnits.includes(r.unit) && !r.name && distCounts[r.district] === 0);
+        if (vacatedUncovered) return { div, row: vacatedUncovered };
+      }
+      for (const div of searchDivs) {
+        const vacatedUnits = (app.dayOffRoster[div] || []).map(x => x.homeUnit);
+        const vacatedAny = app.officers[div].find(r => vacatedUnits.includes(r.unit) && !r.name);
+        if (vacatedAny) return { div, row: vacatedAny };
+      }
+
+      // Priority 2: Fill any open car in an uncovered district (distCounts === 0)
+      for (const div of searchDivs) {
+        const uncoveredOpen = app.officers[div].find(r => r.unit && !r.name && !r.sectionHeader && r.district && distCounts[r.district] === 0);
+        if (uncoveredOpen) return { div, row: uncoveredOpen };
+      }
+
+      // Priority 3: Prefer a car slot that was floated out (if any)
       for (const div of searchDivs) {
         const floatedOrigin = app.officers[div].find(r => !r.name && r.floatedTo);
         if (floatedOrigin) return { div, row: floatedOrigin };
@@ -11562,8 +11591,8 @@
         status: 'approved',
         title: `🏆 Automated Hire-Back Awarded: [${fromShift}-Shift] ${name} (#${pe}) Notified & Placed in ${slot.row.unit} (${slot.div})`,
         step1: `Step 1 (Award Rule): ${ruleLabel}.`,
-        step2: `Step 2 (Officer Notification & Placement): Push notification sent to ${name} (#${pe}) and placed in Unit ${slot.row.unit} (${slot.div} Division).`,
-        step3: `Step 3 (Shift Count Restored): Shift Count ${countBefore} → ${countAfter} (Minimum ${app.shiftMin}).`
+        step2: `Step 2 (Officer Notification & Placement): Push notification sent to ${name} (#${pe}) and placed directly into Unit ${slot.row.unit} (${slot.div} Division).`,
+        step3: `Step 3 (Shift Count Restored): Shift Count ${countBefore} → ${countAfter} (Minimum ${app.shiftMin}). All other officers remain in their normal assignments.`
       };
 
       app.auditEntries.unshift({
@@ -11688,14 +11717,16 @@
         ensureAutomatedHireBackBroadcast();
         app.auditEntries.unshift({
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-          msg: `🔔 Automated Hire-Back Alert broadcast to ${app.hireBackOptInPes.length} Opted-In Officers (${app.selectedShift}-Shift Count ${countAfter}/${app.shiftMin}). ${app.hireBackBids.length} officers submitted bids.`,
+          msg: `🔔 Automated Hire-Back Alert broadcast to ${app.hireBackOptInPes.length} Opted-In Officers (${app.selectedShift}-Shift Count ${countAfter}/${app.shiftMin}). ${app.hireBackBids.length} officers submitted bids. No floating triggered so the Hire-Back winner fills ${homeSlotUnit} directly.`,
           tag: 'Art. 35 Broadcast'
         });
       }
 
-      const floatExplanation = relevantFloat
-        ? `Step 3 (Auto-Float): District ${relevantFloat.district} (${relevantFloat.toUnit}) dropped to 0 units → ${relevantFloat.name} (#${relevantFloat.pe}) automatically floated from ${relevantFloat.fromUnit} (${relevantFloat.fromDiv}) into ${relevantFloat.toUnit} (${relevantFloat.toDiv}).`
-        : `Step 3 (District Check): District still covered; no float required.`;
+      const floatExplanation = countAfter < app.shiftMin
+        ? `Step 3 (No Float Below Min): Everyone stays in their normal assignment — ${homeSlotUnit} (${homeSlotDiv}) is held open so the awarded Hire-Back officer fills that role directly.`
+        : relevantFloat
+          ? `Step 3 (Auto-Float): District ${relevantFloat.district} (${relevantFloat.toUnit}) dropped to 0 units → ${relevantFloat.name} (#${relevantFloat.pe}) automatically floated from ${relevantFloat.fromUnit} (${relevantFloat.fromDiv}) into ${relevantFloat.toUnit} (${relevantFloat.toDiv}).`
+          : `Step 3 (District Check): District still covered; no float required.`;
 
       const countExplanation = countAfter < app.shiftMin
         ? `Step 1 (Count & Broadcast): Shift Count ${countBefore} → ${countAfter} (Below Min ${app.shiftMin}). Automated Hire-Back Alert sent to ${app.hireBackOptInPes.length} Opted-In Officers!`
@@ -11711,7 +11742,7 @@
 
       app.auditEntries.unshift({
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        msg: `${offName} (#${offPe}) [${homeSlotUnit}] marked ${leaveConfig.shortCode} (${leaveConfig.categoryLabel}). ${relevantFloat ? `${relevantFloat.name} (#${relevantFloat.pe}) floated ${relevantFloat.fromUnit} → ${relevantFloat.toUnit}.` : ''}`,
+        msg: `${offName} (#${offPe}) [${homeSlotUnit}] marked ${leaveConfig.shortCode} (${leaveConfig.categoryLabel}). ${countAfter < app.shiftMin ? `${homeSlotUnit} held open for Hire-Back winner (no officers floated from normal assignments).` : relevantFloat ? `${relevantFloat.name} (#${relevantFloat.pe}) floated ${relevantFloat.fromUnit} → ${relevantFloat.toUnit}.` : ''}`,
         tag: leaveConfig.article
       });
 
@@ -11724,17 +11755,27 @@
       const entry = app.dayOffRoster[div][idx];
       app.dayOffRoster[div].splice(idx, 1);
 
+      // If a Hire-Back officer was temporarily occupying this home car, clear the temporary Hire-Back flag so the home officer gets their car back
+      const homeRow = (app.officers[div] || []).find(r => r.unit === homeUnit);
+      if (homeRow && (homeRow.isHireBack || homeRow.isReturnedOffTime)) {
+        homeRow.isHireBack = false;
+        homeRow.isReturnedOffTime = false;
+        homeRow.hireBackShift = null;
+        homeRow.returnedMeta = null;
+        homeRow.assign = '';
+      }
+
       app.toastData = {
         status: 'approved',
         title: `Returned to Duty: ${entry.name} (#${entry.pe}) Restored to ${homeUnit} (${div})`,
         step1: `Step 1: ${entry.name} (#${entry.pe}) removed from the Scheduled Off-Time column and restored to ${homeUnit}.`,
-        step2: `Step 2: Floated coverage reassignments automatically reversed back to home cars.`,
+        step2: `Step 2: Normal car assignments verified.`,
         step3: ''
       };
 
       app.auditEntries.unshift({
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        msg: `Restored ${entry.name} (#${entry.pe}) back to ${homeUnit} (${div}). Reversed float reassignments.`,
+        msg: `Restored ${entry.name} (#${entry.pe}) back to ${homeUnit} (${div}).`,
         tag: 'Restored'
       });
 
@@ -12048,12 +12089,13 @@
           const isSpecificallyLoggedInOfficer = isOccupied && app.loggedInPe !== 'COD' && r.pe === app.loggedInPe;
           const isFloatedHere = Boolean(r.floatedFrom);
           const wasFloatedAway = Boolean(r.floatedTo);
+          const vacatedDayOffEntry = (!isOccupied && r.unit) ? (app.dayOffRoster[div] || []).find(o => o.homeUnit === r.unit) : null;
 
           const unitCls = r.bidCar ? 'unit-cell unit-bid-car' : 'unit-cell';
           let cellStateCls = '';
           if (isSpecificallyLoggedInOfficer) cellStateCls = 'row-logged-in';
           else if (isFloatedHere || r.isHireBack || r.isReturnedOffTime) cellStateCls = 'row-floated-in';
-          else if (wasFloatedAway) cellStateCls = 'row-floated-out';
+          else if (wasFloatedAway || vacatedDayOffEntry) cellStateCls = 'row-floated-out';
 
           let officerHtml = '';
           if (isOccupied) {
@@ -12089,6 +12131,13 @@
                 <button type="button" onclick="openHireBackPopover(event, '${div}', '${r.unit}')" class="px-1.5 py-0.2 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 font-mono font-bold text-[9.5px] cursor-pointer shrink-0" title="Assign Cross-Shift Hire-Back to this open car">+ Hire-Back ▾</button>
               </div>
             `;
+          } else if (vacatedDayOffEntry) {
+            officerHtml = `
+              <div class="flex items-center justify-between gap-1">
+                <span class="text-[10.5px] italic text-red-600 dark:text-red-400 truncate">⚡ Open Role (<strong>${vacatedDayOffEntry.name}</strong> Off)</span>
+                <button type="button" onclick="openHireBackPopover(event, '${div}', '${r.unit}')" class="px-1.5 py-0.2 rounded bg-red-500/20 hover:bg-red-500/30 text-red-700 dark:text-red-300 font-mono font-bold text-[9.5px] cursor-pointer shrink-0" title="Fill ${r.unit} with Hire-Back Winner">+ Hire-Back ▾</button>
+              </div>
+            `;
           } else if (i === 30 && div === 'NW') {
             officerHtml = `<span class="text-[10px] text-[var(--text-faint)] font-mono">11/14/2026</span>`;
           }
@@ -12103,6 +12152,8 @@
             assignHtml = `<span class="font-mono font-bold text-[10px] text-amber-700 dark:text-amber-300">FM ${r.floatedFrom.unit}</span>`;
           } else if (wasFloatedAway) {
             assignHtml = `<span class="font-mono text-[10px] text-[var(--text-muted)]">→ ${r.floatedTo.unit}</span>`;
+          } else if (vacatedDayOffEntry) {
+            assignHtml = `<span class="px-1 py-0.2 rounded bg-red-500/15 text-red-600 dark:text-red-300 font-mono font-bold text-[9.5px]">OPEN HB</span>`;
           }
 
           html += `
@@ -12447,7 +12498,7 @@
             <button onclick="handleOfficerStatusSelect('${loc.div}', '${loc.unit}', 'SICK')" class="w-full p-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 flex items-center justify-between text-left transition cursor-pointer">
               <div>
                 <div class="font-bold text-red-300">🤒 Call In Sick Leave</div>
-                <div class="text-[10px] text-slate-400">Moves you to Sick column &amp; auto-floats coverage</div>
+                <div class="text-[10px] text-slate-400">Moves to Sick column &amp; opens Hire-Back for ${loc.unit} if below min</div>
               </div>
               <span class="text-xs text-red-300 font-bold">→</span>
             </button>
@@ -12571,7 +12622,9 @@
               <div class="font-bold text-amber-300">Automated Coverage Summary:</div>
               ${covMove
                 ? `<div>Unit <strong>${loc.unit}</strong> is now covered by <strong>${covMove.name} (#${covMove.pe})</strong>, floated from <strong>${covMove.fromUnit} (${covMove.fromDiv})</strong>.</div>`
-                : `<div>Your district maintains minimum car coverage.</div>`}
+                : count < min
+                  ? `<div>Unit <strong>${loc.unit}</strong> is held open for the incoming <strong>Hire-Back Winner</strong> — no officers are floated out of their normal assignments while below minimum (${count}/${min}).</div>`
+                  : `<div>Your district maintains minimum car coverage.</div>`}
             </div>
           </div>
 
@@ -12619,16 +12672,21 @@
       });
 
       let rank = 1;
-      document.getElementById('floatQueueMiniList').innerHTML = candidates.map(c => `
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ${c.canFloat ? '' : 'opacity-55'}">
+      const pauseFloatBanner = count < min
+        ? `<div class="p-2 mb-1 rounded-lg bg-red-500/15 border border-red-500/30 text-[10.5px] text-red-700 dark:text-red-300 font-semibold leading-snug">
+             ⏸️ <strong>Floating Paused Below Min (${count}/${min}):</strong> Everyone stays in their normal assignment; the awarded Hire-Back officer fills the vacated role directly.
+           </div>`
+        : '';
+      document.getElementById('floatQueueMiniList').innerHTML = pauseFloatBanner + candidates.map(c => `
+        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ${c.canFloat && count >= min ? '' : 'opacity-55'}">
           <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold ${c.canFloat ? 'bg-amber-500/20 text-amber-600 dark:text-amber-300' : 'bg-slate-500/15 text-[var(--text-muted)]'}">
+            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold ${c.canFloat && count >= min ? 'bg-amber-500/20 text-amber-600 dark:text-amber-300' : 'bg-slate-500/15 text-[var(--text-muted)]'}">
               ${c.canFloat ? `#${rank++}` : 'LOCK'}
             </span>
             <span class="font-bold truncate">${c.name} (${c.pe})</span>
             <span class="text-[var(--text-muted)] text-[10px]">[${c.unit}]</span>
           </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">${c.reason}</span>
+          <span class="text-[10px] text-[var(--text-muted)] shrink-0">${count < min && c.canFloat ? '⏸️ Held in Home Car' : c.reason}</span>
         </div>
       `).join('');
 
