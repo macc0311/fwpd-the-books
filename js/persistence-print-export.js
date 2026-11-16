@@ -5,8 +5,8 @@
 (function () {
   'use strict';
 
-  const STORAGE_KEY = 'fwpd_the_books_state_v2_6';
-  const SCHEMA_VERSION = '2.6.0';
+  const STORAGE_KEY = 'fwpd_the_books_state_v3_0_unified';
+  const SCHEMA_VERSION = '3.0.0';
   let isRestoring = false;
   let lastSavedTimeStr = 'Just now';
 
@@ -43,6 +43,12 @@
       command: app.command,
       officers: app.officers,
       dayOffRoster: app.dayOffRoster,
+      offTimeSheet: app.offTimeSheet || null,
+      hireBackOptInPes: Array.isArray(app.hireBackOptInPes) ? app.hireBackOptInPes : null,
+      hireBackNoticeMode: app.hireBackNoticeMode || 'SENIORITY_24HR',
+      hireBackBids: Array.isArray(app.hireBackBids) ? app.hireBackBids : [],
+      hireBackBidCounter: app.hireBackBidCounter || 1,
+      hireBackLastWinnerNotification: app.hireBackLastWinnerNotification || null,
       floatedMoves: app.floatedMoves,
       auditEntries: app.auditEntries,
       savedHistory: app.savedHistory || {},
@@ -110,6 +116,26 @@
       app.dayOffRoster = data.dayOffRoster
         ? JSON.parse(JSON.stringify(data.dayOffRoster))
         : { NW: [], NE: [], SW: [], SE: [] };
+      if (data.offTimeSheet && typeof data.offTimeSheet === 'object') {
+        app.offTimeSheet = JSON.parse(JSON.stringify(data.offTimeSheet));
+      }
+      if (Array.isArray(data.hireBackOptInPes)) {
+        app.hireBackOptInPes = [...data.hireBackOptInPes];
+      }
+      if (typeof data.hireBackNoticeMode === 'string') {
+        app.hireBackNoticeMode = data.hireBackNoticeMode;
+      }
+      if (Array.isArray(data.hireBackBids)) {
+        app.hireBackBids = JSON.parse(JSON.stringify(data.hireBackBids));
+      }
+      if (typeof data.hireBackBidCounter === 'number') {
+        app.hireBackBidCounter = data.hireBackBidCounter;
+      }
+      if (data.hireBackLastWinnerNotification !== undefined) {
+        app.hireBackLastWinnerNotification = data.hireBackLastWinnerNotification
+          ? JSON.parse(JSON.stringify(data.hireBackLastWinnerNotification))
+          : null;
+      }
       app.floatedMoves = Array.isArray(data.floatedMoves)
         ? JSON.parse(JSON.stringify(data.floatedMoves))
         : [];

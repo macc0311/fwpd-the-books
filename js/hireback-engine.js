@@ -496,7 +496,32 @@
     return posting;
   }
 
+  function syncAppHireBackBidsIntoPosting(posting) {
+    if (!posting || posting.category !== 'OFFICER' || !Array.isArray(app.hireBackBids)) return;
+    for (const lb of app.hireBackBids) {
+      if (!lb || !lb.pe) continue;
+      if (!posting.bids.some(b => b.pe === lb.pe)) {
+        posting.bids.push({
+          name: lb.name,
+          pe: lb.pe,
+          role: 'OFFICER',
+          bureau: lb.shift === 'DB' ? 'DB' : 'OPS',
+          div: lb.div || 'NE',
+          shift: lb.shift || 'B',
+          badgeLabel: lb.shift ? `Uniform (${lb.shift}-Shift)` : 'Uniform',
+          seq: lb.bidOrder || posting.bidSeqCounter++,
+          bidTime: lb.bidTime || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          source: 'Opt-In Bid Queue'
+        });
+      }
+    }
+  }
+
   function scheduleSimulatedBidsForPosting(posting) {
+    if (posting.category === 'OFFICER') {
+      syncAppHireBackBidsIntoPosting(posting);
+    }
+
     const eligiblePool = EXTENDED_CANDIDATE_POOL.filter(c => evaluateBidderEligibility(c, posting).eligible);
     if (eligiblePool.length === 0) return;
 
@@ -506,10 +531,6 @@
     } else if (posting.bureau === 'DB') {
       picked.push(...eligiblePool.filter(c => c.bureau === 'DB'));
     } else {
-      // Bid #1 arrives immediately from a junior Uniform officer (#1977)
-      // Bid #2 arrives at 2s from a Detective (#1688)
-      // Bid #3 arrives at 4s from a mid-seniority Uniform officer (#1812)
-      // Bid #4 arrives at 6s from a senior Uniform officer (#1742) -> takes #1 Leader spot in >=24h mode!
       const juniorUniform = eligiblePool.find(c => c.pe === 1977) || eligiblePool[eligiblePool.length - 1];
       const detectiveCand = eligiblePool.find(c => c.bureau === 'DB');
       const midUniform = eligiblePool.find(c => c.pe === 1812);
@@ -521,7 +542,7 @@
       if (seniorUniform && !picked.includes(seniorUniform)) picked.push(seniorUniform);
     }
 
-    if (picked[0]) {
+    if (picked[0] && posting.bids.length === 0) {
       submitBidToPosting(posting.id, picked[0], 'MyShift Mobile App');
     }
     if (picked[1] && posting.awardRule === 'SENIORITY') {
@@ -531,7 +552,7 @@
           submitBidToPosting(posting.id, picked[1], 'MyShift Mobile App');
           if (typeof window.renderAll === 'function') window.renderAll();
         }
-      }, 2000);
+      }, 2500);
     }
     if (picked[2] && posting.awardRule === 'SENIORITY') {
       setTimeout(() => {
@@ -540,16 +561,7 @@
           submitBidToPosting(posting.id, picked[2], 'MyShift Mobile App');
           if (typeof window.renderAll === 'function') window.renderAll();
         }
-      }, 4000);
-    }
-    if (picked[3] && posting.awardRule === 'SENIORITY') {
-      setTimeout(() => {
-        const eng = ensureEngineState();
-        if (eng && eng.openPostings.some(p => p.id === posting.id && p.status === 'OPEN')) {
-          submitBidToPosting(posting.id, picked[3], 'MyShift Mobile App');
-          if (typeof window.renderAll === 'function') window.renderAll();
-        }
-      }, 6500);
+      }, 5000);
     }
   }
 
@@ -576,19 +588,35 @@
       return false;
     }
 
+    const bidTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const seqNum = posting.bidSeqCounter++;
     const bidEntry = {
       name: candidate.name,
       pe: candidate.pe,
       role: candidate.role || 'OFFICER',
       bureau: candidate.bureau || 'OPS',
       div: candidate.div || 'NE',
+      shift: candidate.shift || 'B',
       badgeLabel: candidate.badgeLabel || 'Uniform',
-      seq: posting.bidSeqCounter++,
-      bidTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      seq: seqNum,
+      bidTime: bidTimeStr,
       source: sourceLabel || 'Officer Bid'
     };
 
     posting.bids.push(bidEntry);
+
+    if (posting.category === 'OFFICER' && Array.isArray(app.hireBackBids)) {
+      if (!app.hireBackBids.some(b => b.pe === candidate.pe)) {
+        app.hireBackBids.push({
+          pe: candidate.pe,
+          name: candidate.name,
+          shift: candidate.shift || 'B',
+          div: candidate.div || 'NE',
+          bidOrder: app.hireBackBidCounter ? app.hireBackBidCounter++ : seqNum,
+          bidTime: bidTimeStr
+        });
+      }
+    }
 
     if (posting.awardRule === 'FCFS' && sourceLabel === 'Instant Manual Claim') {
       finalizeHireBackAward(posting.id, 'FCFS_INSTANT');
@@ -1114,6 +1142,9 @@
     const eng = ensureEngineState();
     if (!eng) return;
     eng.noticeMode = newMode;
+    app.hireBackNoticeMode = (newMode === 'SHORT_UNDER24' || newMode === 'SHIFT_STARTED')
+      ? 'FCFS_UNDER_24HR'
+      : 'SENIORITY_24HR';
 
     for (const p of eng.openPostings) {
       p.noticeMode = newMode;
@@ -1251,12 +1282,12 @@
       ? `<span class="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-extrabold text-[10.5px]">⚡ ACTING COD: ${supAudit.actingCod.name} (#${supAudit.actingCod.pe}) [FOPLC Art. 25]</span>`
       : `<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-200 border border-blue-500/30 font-semibold text-[10.5px]">COD: ${supAudit.ltCount} LT / ${supAudit.sgtCount} SGT On Duty</span>`;
 
-    // Render any active countdown postings RIGHT AT THE TOP of the page so the user never misses the timer!
     let topLiveCountdownsHtml = '';
     if (openPostings.length > 0) {
       topLiveCountdownsHtml = `
         <div class="mt-2.5 pt-2.5 border-t border-blue-500/40 space-y-2">
           ${openPostings.map(p => {
+            if (p.category === 'OFFICER') syncAppHireBackBidsIntoPosting(p);
             const sortedBids = sortBidsForPosting(p.bids, p);
             const leader = sortedBids[0];
             const pct = Math.max(0, Math.min(100, Math.round((p.secondsRemaining / p.secondsTotal) * 100)));
@@ -1457,6 +1488,7 @@
     const supAudit = auditSupervisorMinimums();
     const openPostings = eng.openPostings;
     const recentClosed = eng.closedNotifications.slice(0, 2);
+    const optInCount = Array.isArray(app.hireBackOptInPes) ? app.hireBackOptInPes.length : 12;
 
     if (openPostings.length > 0) {
       hbBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300 animate-pulse';
@@ -1472,6 +1504,7 @@
     let html = '<div class="space-y-2 mt-1">';
 
     for (const p of openPostings) {
+      if (p.category === 'OFFICER') syncAppHireBackBidsIntoPosting(p);
       const sortedBids = sortBidsForPosting(p.bids, p);
       const pct = Math.max(0, Math.min(100, Math.round((p.secondsRemaining / p.secondsTotal) * 100)));
 
@@ -1501,6 +1534,15 @@
                 <span class="text-[9.5px]">${b.badgeLabel}</span>
               </div>
             `).join('')}
+          </div>
+
+          <div class="flex items-center gap-1.5 pt-0.5">
+            <button type="button" onclick="expirePostingNow('${p.id}')" class="flex-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-extrabold cursor-pointer shadow">
+              ⏩ Expire &amp; Auto-Award Winner Now
+            </button>
+            <button type="button" onclick="toggleHbTimerPause()" class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[10.5px] font-bold cursor-pointer">
+              ${eng.timerPaused ? '▶' : '⏸'}
+            </button>
           </div>
         </div>
       `;
@@ -1537,6 +1579,14 @@
       }
     }
 
+    // Always include Luke's PR #3 Searchable Cross-Shift Opt-In & Bidding Database button!
+    html += `
+      <button type="button" onclick="openHireBackPopover(event)" class="w-full px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-semibold transition cursor-pointer flex items-center justify-between">
+        <span>🔍 View All Bids &amp; Opt-In Database (${optInCount} Opted-In)</span>
+        <span>▾</span>
+      </button>
+    `;
+
     html += '</div>';
     hbBox.innerHTML = html;
   }
@@ -1570,6 +1620,7 @@
     `;
 
     for (const p of openPostings) {
+      if (p.category === 'OFFICER') syncAppHireBackBidsIntoPosting(p);
       const sortedBids = sortBidsForPosting(p.bids, p);
       const leader = sortedBids[0];
 
@@ -1627,7 +1678,6 @@
     `;
 
     section.innerHTML = html;
-    // Insert right at the top of mobileAppBody if an open posting or recent award exists!
     if (openPostings.length > 0 || recentClosed.length > 0) {
       container.insertBefore(section, container.firstChild);
     } else {
@@ -1676,6 +1726,62 @@
         renderEnhancedCommandRows();
         renderEnhancedHireBackCard();
         appendMobileAppHireBackCenter();
+      };
+    }
+
+    const origReturnStatic = window.returnStaticOfficerToWork;
+    if (typeof origReturnStatic === 'function') {
+      window.returnStaticOfficerToWork = function (categoryKey, div, idx, pe) {
+        origReturnStatic.apply(this, arguments);
+        checkAndCreatePostingsForCurrentShortages();
+        renderControlStrip();
+        renderEnhancedCommandRows();
+        renderEnhancedHireBackCard();
+        appendMobileAppHireBackCenter();
+      };
+    }
+
+    const origRemoveHb = window.removeHireBackOfficer;
+    if (typeof origRemoveHb === 'function') {
+      window.removeHireBackOfficer = function (div, unit) {
+        origRemoveHb.apply(this, arguments);
+        checkAndCreatePostingsForCurrentShortages({
+          div,
+          unit,
+          name: 'Hire-Back Removed',
+          reason: `Hire-Back removed from Unit ${unit} (${div})`
+        });
+        renderControlStrip();
+        renderEnhancedCommandRows();
+        renderEnhancedHireBackCard();
+        appendMobileAppHireBackCenter();
+      };
+    }
+
+    const origSubmitHbBid = window.submitHireBackBid;
+    if (typeof origSubmitHbBid === 'function') {
+      window.submitHireBackBid = function (pe, keepOpen) {
+        origSubmitHbBid.apply(this, arguments);
+        const eng = ensureEngineState();
+        if (eng) {
+          for (const p of eng.openPostings) {
+            if (p.category === 'OFFICER') {
+              syncAppHireBackBidsIntoPosting(p);
+            }
+          }
+        }
+        renderControlStrip();
+        renderEnhancedHireBackCard();
+        appendMobileAppHireBackCenter();
+      };
+    }
+
+    const origSetNoticeMode = window.setHireBackNoticeMode;
+    if (typeof origSetNoticeMode === 'function') {
+      window.setHireBackNoticeMode = function (mode) {
+        origSetNoticeMode.apply(this, arguments);
+        const mapped = mode === 'FCFS_UNDER_24HR' ? 'SHORT_UNDER24' : 'ADVANCE_24PLUS';
+        window.setHbNoticeMode(mapped);
       };
     }
 
