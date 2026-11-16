@@ -34,15 +34,16 @@
     { name: 'SGT. DET. CHEN, W', pe: 1645, role: 'SGT', bureau: 'DB', div: 'NE', shift: 'DB', badgeLabel: 'Det. Sergeant (DB)' }
   ];
 
-  // Bid Window Default Duration (seconds in live demo for >=24h auto-expiry)
-  const BID_WINDOW_SECONDS = 35;
+  // Live Zero-Touch Countdown Durations (12s for >=24h Seniority Bid Collection; 4s for <24h Instant FCFS)
+  const BID_WINDOW_SECONDS = 12;
   const FCFS_AUTO_FILL_SECONDS = 4;
 
   // ===========================================================================
-  // 2. ENGINE STATE (Attached to window.app.hbEngine for persistence)
+  // 2. ENGINE STATE (Attached to global `app.hbEngine` for persistence)
   // ===========================================================================
   function ensureEngineState() {
-    if (!window.app) return null;
+    if (typeof app === 'undefined' || !app) return null;
+    window.app = app; // Expose lexical `let app` onto window for easy debugging
     if (!app.hbEngine) {
       app.hbEngine = {
         // Notice mode: 'ADVANCE_24PLUS' (>=24h), 'SHORT_UNDER24' (<24h), 'SHIFT_STARTED' (In-Shift)
@@ -58,6 +59,10 @@
         actingCodInfo: null        // { name, pe, unit, div } when Senior Sgt is elevated per FOPLC Art. 24 §2A & Art. 25
       };
     }
+    if (!Array.isArray(app.hbEngine.openPostings)) app.hbEngine.openPostings = [];
+    if (!Array.isArray(app.hbEngine.closedNotifications)) app.hbEngine.closedNotifications = [];
+    if (!Array.isArray(app.hbEngine.supervisorStandbyList)) app.hbEngine.supervisorStandbyList = [];
+    if (!Array.isArray(app.hbEngine.commandOffRoster)) app.hbEngine.commandOffRoster = [];
     return app.hbEngine;
   }
 
@@ -85,8 +90,8 @@
         simClockNote: `36h prior to ${app.selectedDate} ${shiftStart}`,
         contractCite: app.selectedBureau === 'DB' ? 'PBA Art. 35 §4 (DB Seniority)' : 'PBA Art. 35 §4 & FOPLC Art. 24 §4B',
         ruleSummary: app.selectedBureau === 'DB'
-          ? 'Collects Detective Bureau bids → Auto-awards to lowest PE# when window expires & notifies all bidders.'
-          : 'Collects bids → Auto-awards by Seniority (Uniform Division priority, lowest PE#) when window expires & notifies all bidders.'
+          ? 'Outside 24h: Collects Detective Bureau bids → Auto-awards to lowest PE# when timer hits 0s & notifies all bidders.'
+          : 'Outside 24h: Collects bids → Auto-awards by Seniority (Uniform Division priority, lowest PE#) when timer hits 0s & notifies all bidders.'
       };
     }
     if (mode === 'SHORT_UNDER24') {
@@ -96,8 +101,8 @@
         simClockNote: `5h prior to ${app.selectedDate} ${shiftStart}`,
         contractCite: 'PBA Art. 35 §4 & FOPLC Art. 24 §4C',
         ruleSummary: app.selectedBureau === 'DB'
-          ? 'Urgent DB notification → Auto-awards First-Come, First-Served (FCFS) within Detective Bureau.'
-          : 'Radio + MDC + App Broadcast → Auto-populates First-Come, First-Served (FCFS) Dept-Wide (includes Detectives & Exempt/Gang/Narcotics).'
+          ? 'Inside 24h: Urgent DB notification → Auto-populates First-Come, First-Served (FCFS) within Detective Bureau.'
+          : 'Inside 24h: Radio + MDC + App Broadcast → Auto-populates First-Come, First-Served (FCFS) Dept-Wide (includes Detectives & Exempt/Gang/Narcotics).'
       };
     }
     return {
@@ -138,7 +143,6 @@
   }
 
   function isMemberOnSickOrLightDuty(pe) {
-    // Check current shift dayOffRoster for SICK or offTimeSheet
     for (const div of DIV_KEYS) {
       const off = (app.dayOffRoster[div] || []).find(o => o.pe === pe);
       if (off && /SICK|LIGHT/i.test(off.status || '')) return true;
@@ -169,7 +173,7 @@
         reason: 'Blocked (FOPLC Art. 26): Currently on Sick / Light Duty'
       };
     }
-    // Rule 3: Already on duty on this shift (unless bidding on a 4-hour extension or command check)
+    // Rule 3: Already on duty on this shift
     if (isMemberAlreadyWorkingCurrentShift(candidate.pe)) {
       return {
         eligible: false,
@@ -191,7 +195,6 @@
         };
       }
     } else {
-      // Officer / Detective Hire-Back
       if (candidate.role === 'LT' || candidate.role === 'SGT') {
         return {
           eligible: false,
@@ -210,14 +213,6 @@
     return { eligible: true, reason: 'Eligible' };
   }
 
-  /**
-   * Sort bids according to PBA Art. 35 §4 & FOPLC Art. 24 §4:
-   * - If noticeMode === 'ADVANCE_24PLUS' and Full-Shift:
-   *   - For OPS Officers: Uniform Division ('OPS') has priority over Non-Uniform ('DB'/'EXEMPT'), then lowest PE# wins.
-   *   - For Supervisors: Primary assigned division / Uniform priority, then lowest PE# wins.
-   * - If noticeMode === 'SHORT_UNDER24' or Partial-Shift ('FIRST_4H', 'LAST_4H'):
-   *   - First-Come, First-Served (earliest bid timestamp / sequence wins).
-   */
   function sortBidsForPosting(bids, posting) {
     const isFcfs = posting.awardRule === 'FCFS';
     return [...bids].sort((a, b) => {
@@ -226,7 +221,6 @@
       }
       // Seniority Award (>= 24 Hours Notice)
       if (posting.category === 'SUPERVISOR') {
-        // FOPLC Art. 24 §2B & §4A: Preference to Uniform Division & primary quadrant if specified
         const aUniform = a.bureau === 'OPS' ? 0 : 1;
         const bUniform = b.bureau === 'OPS' ? 0 : 1;
         if (aUniform !== bUniform) return aUniform - bUniform;
@@ -236,7 +230,7 @@
           const bSameDiv = b.div === posting.targetDiv ? 0 : 1;
           if (aSameDiv !== bSameDiv) return aSameDiv - bSameDiv;
         }
-        return a.pe - b.pe; // Lowest PE# = Highest Seniority
+        return a.pe - b.pe;
       }
 
       // PBA Art. 35 §4 (Uniform Division): Priority to Officers bid/assigned to a Uniform Division or Shift
@@ -247,7 +241,7 @@
           return aUniformPriority - bUniformPriority;
         }
       }
-      return a.pe - b.pe; // Lowest PE# = Highest Seniority
+      return a.pe - b.pe;
     });
   }
 
@@ -268,7 +262,6 @@
       };
     }
 
-    // Clear previous dynamic Acting COD tag before re-evaluating
     for (const div of DIV_KEYS) {
       for (const cell of app.command[div] || []) {
         if (cell.isAutoActingCod) {
@@ -290,11 +283,10 @@
         const cell = app.command[div][i];
         if (!cell || !cell.name || cell.pe === null) continue;
         const upper = cell.name.toUpperCase();
-        // Check if partial-shift absence (88/87)
         const isPartialAbsent = /\b(88|87)\b/.test(cell.assign || '');
-        if (upper.startsWith('LT') || cell.unit.startsWith('72')) {
+        if (upper.startsWith('LT') || (cell.unit && cell.unit.startsWith('72'))) {
           workingLts.push({ div, idx: i, cell, isPartialAbsent });
-        } else if (upper.startsWith('SGT') || /^(110|120|130|210|220|230|310|320|330|410|420|430)$/.test(cell.unit)) {
+        } else if (upper.startsWith('SGT') || /^(110|120|130|210|220|230|310|320|330|410|420|430)$/.test(cell.unit || '')) {
           workingSgts.push({ div, idx: i, cell, isPartialAbsent });
           quadrantSgts[div] = (quadrantSgts[div] || 0) + 1;
         }
@@ -308,10 +300,8 @@
     let deficitDiv = missingQuadrants[0] || 'NW';
     let deficitReason = '';
 
-    // FOPLC Art. 24 §2A & Art. 25: Check if NO Lieutenant is working (for OPS Uniform Division)
     if (app.selectedBureau === 'OPS') {
       if (workingLts.length === 0 && workingSgts.length > 0) {
-        // Sort working Sergeants by Seniority (lowest PE# wins)
         const sortedSgts = [...workingSgts].sort((a, b) => a.cell.pe - b.cell.pe);
         const seniorSgt = sortedSgts[0];
         seniorSgt.cell.origAssignBeforeCod = seniorSgt.cell.assign || '';
@@ -327,9 +317,6 @@
           div: seniorSgt.div
         };
 
-        // Per FOPLC Art. 24 §2A:
-        // - If 5+ Sergeants are working (and all quadrants covered), Senior Sgt is Acting COD and NO hire-back is needed!
-        // - If <= 4 Sergeants are working, Senior Sgt becomes COD AND a Supervisor Hire-Back is initiated!
         if (workingSgts.length < 5) {
           needsSupervisorHireBack = true;
           deficitType = 'COD_AND_QUADRANT_SGT';
@@ -338,7 +325,6 @@
         }
       }
 
-      // FOPLC Art. 24 §2B: Minimum 1 Uniform Sergeant per quadrant (NW, NE, SW, SE = 4 total)
       if (missingQuadrants.length > 0) {
         needsSupervisorHireBack = true;
         deficitType = 'QUADRANT_SGT';
@@ -346,7 +332,6 @@
         deficitReason = `${missingQuadrants.join(', ')} Division has 0 working Sergeants (FOPLC Art. 24 §2B requires minimum 1 Uniform Sgt per quadrant)`;
       }
 
-      // FOPLC Art. 24 §3: Partial-shift Lieutenant absence when <5 Sergeants
       const partialLt = workingLts.find(l => l.isPartialAbsent);
       if (partialLt && workingSgts.length < 5 && !needsSupervisorHireBack) {
         needsSupervisorHireBack = true;
@@ -379,23 +364,19 @@
       ? [preferredDiv, ...DIV_KEYS.filter(d => d !== preferredDiv)]
       : DIV_KEYS;
 
-    // 1. Prefer a car vacated by a float (so the floated officer can stay or return, or fill the open slot)
     for (const div of searchOrder) {
       const floatedOrigin = (app.officers[div] || []).find(r => !r.name && r.floatedTo);
       if (floatedOrigin) return { div, unit: floatedOrigin.unit, row: floatedOrigin };
     }
-    // 2. Prefer a car whose home officer marked off in dayOffRoster
     for (const div of searchOrder) {
       const markedOffUnits = (app.dayOffRoster[div] || []).map(o => o.homeUnit);
       const vacatedRow = (app.officers[div] || []).find(r => r.unit && !r.name && markedOffUnits.includes(r.unit));
       if (vacatedRow) return { div, unit: vacatedRow.unit, row: vacatedRow };
     }
-    // 3. Any open non-bid car
     for (const div of searchOrder) {
       const openRow = (app.officers[div] || []).find(r => r.unit && !r.name && !r.bidCar);
       if (openRow) return { div, unit: openRow.unit, row: openRow };
     }
-    // 4. Any open car with a unit ID
     for (const div of searchOrder) {
       const anyRow = (app.officers[div] || []).find(r => r.unit && !r.name);
       if (anyRow) return { div, unit: anyRow.unit, row: anyRow };
@@ -437,10 +418,9 @@
     const isShiftStartedBlocked = noticeMode === 'SHIFT_STARTED' && !eng.dutyChiefAuthorized;
     const isUnder24 = noticeMode === 'SHORT_UNDER24' || (noticeMode === 'SHIFT_STARTED' && eng.dutyChiefAuthorized);
 
-    // Determine blockType & awardRule per PBA Art. 35 §2 & §4 and FOPLC Art. 24 §3 & §4
-    let blockType = options.blockType || 'FULL_SHIFT'; // 'FULL_SHIFT' | 'FIRST_4H' | 'LAST_4H'
+    let blockType = options.blockType || 'FULL_SHIFT';
     if (options.isCShiftTraining) {
-      blockType = 'LAST_4H'; // PBA Art. 35 §2: C-Shift morning training only offers Last 4 Hours
+      blockType = 'LAST_4H';
     }
 
     const awardRule = (isUnder24 || blockType !== 'FULL_SHIFT') ? 'FCFS' : 'SENIORITY';
@@ -456,8 +436,8 @@
     const posting = {
       id: bidId,
       createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      category: options.category || 'OFFICER', // 'OFFICER' | 'SUPERVISOR'
-      requiredRank: options.requiredRank || null, // 'LT' | 'SGT' | null
+      category: options.category || 'OFFICER',
+      requiredRank: options.requiredRank || null,
       bureau: app.selectedBureau,
       shift: app.selectedShift,
       date: app.selectedDate,
@@ -467,8 +447,8 @@
       triggeredByPe: options.triggeredByPe || null,
       triggerReason: options.triggerReason || 'Shift Count Below Minimum',
       noticeMode,
-      awardRule, // 'SENIORITY' (>=24h) | 'FCFS' (<24h or Partial 4h)
-      blockType, // 'FULL_SHIFT' | 'FIRST_4H' | 'LAST_4H'
+      awardRule,
+      blockType,
       durationHrs,
       isCShiftTraining: Boolean(options.isCShiftTraining),
       status: isShiftStartedBlocked ? 'HELD_DUTY_CHIEF' : 'OPEN',
@@ -480,7 +460,6 @@
 
     eng.openPostings.unshift(posting);
 
-    // Log creation in Contract Audit Trail
     const ruleTag = posting.category === 'SUPERVISOR'
       ? 'FOPLC Art. 24'
       : (posting.isCShiftTraining ? 'PBA Art. 35 §2 (C-Train)' : 'PBA Art. 35 §4');
@@ -497,7 +476,6 @@
         : `[${posting.id}] Auto-Posted ${posting.blockType.replace('_', ' ')} (${posting.durationHrs}) Hire-Back for ${posting.targetUnit} (${posting.targetDiv}) via ${broadcastChannel}.`
     });
 
-    // If FOPLC Supervisor Standby List already has a waiting supervisor for this shift, auto-award immediately per FOPLC Art. 24 §4B!
     if (posting.category === 'SUPERVISOR' && !isShiftStartedBlocked && eng.supervisorStandbyList.length > 0) {
       const standbyWinner = eng.supervisorStandbyList.shift();
       posting.bids.push({
@@ -510,7 +488,6 @@
       return posting;
     }
 
-    // Seed simulated officer bids if autoSimulateBids is enabled
     if (eng.autoSimulateBids && !isShiftStartedBlocked) {
       scheduleSimulatedBidsForPosting(posting);
     }
@@ -520,22 +497,23 @@
   }
 
   function scheduleSimulatedBidsForPosting(posting) {
-    // Pick 3 eligible candidates from EXTENDED_CANDIDATE_POOL
     const eligiblePool = EXTENDED_CANDIDATE_POOL.filter(c => evaluateBidderEligibility(c, posting).eligible);
     if (eligiblePool.length === 0) return;
 
-    // Shuffle or pick a diverse set (including junior and senior so user sees Seniority vs FCFS difference!)
     const picked = [];
     if (posting.category === 'SUPERVISOR') {
       picked.push(...eligiblePool.slice(0, 3));
     } else if (posting.bureau === 'DB') {
       picked.push(...eligiblePool.filter(c => c.bureau === 'DB'));
     } else {
-      // Include a junior Uniform officer first (so in FCFS they win, while in >=24h Seniority a senior Uniform officer wins!)
+      // Bid #1 arrives immediately from a junior Uniform officer (#1977)
+      // Bid #2 arrives at 2s from a Detective (#1688)
+      // Bid #3 arrives at 4s from a mid-seniority Uniform officer (#1812)
+      // Bid #4 arrives at 6s from a senior Uniform officer (#1742) -> takes #1 Leader spot in >=24h mode!
       const juniorUniform = eligiblePool.find(c => c.pe === 1977) || eligiblePool[eligiblePool.length - 1];
       const detectiveCand = eligiblePool.find(c => c.bureau === 'DB');
-      const seniorUniform = eligiblePool.find(c => c.pe === 1742) || eligiblePool[0];
       const midUniform = eligiblePool.find(c => c.pe === 1812);
+      const seniorUniform = eligiblePool.find(c => c.pe === 1742) || eligiblePool[0];
 
       if (juniorUniform) picked.push(juniorUniform);
       if (detectiveCand) picked.push(detectiveCand);
@@ -543,7 +521,6 @@
       if (seniorUniform && !picked.includes(seniorUniform)) picked.push(seniorUniform);
     }
 
-    // Add first simulated bid immediately so the user sees instant activity
     if (picked[0]) {
       submitBidToPosting(posting.id, picked[0], 'MyShift Mobile App');
     }
@@ -554,7 +531,7 @@
           submitBidToPosting(posting.id, picked[1], 'MyShift Mobile App');
           if (typeof window.renderAll === 'function') window.renderAll();
         }
-      }, 1200);
+      }, 2000);
     }
     if (picked[2] && posting.awardRule === 'SENIORITY') {
       setTimeout(() => {
@@ -563,7 +540,7 @@
           submitBidToPosting(posting.id, picked[2], 'MyShift Mobile App');
           if (typeof window.renderAll === 'function') window.renderAll();
         }
-      }, 2600);
+      }, 4000);
     }
     if (picked[3] && posting.awardRule === 'SENIORITY') {
       setTimeout(() => {
@@ -572,7 +549,7 @@
           submitBidToPosting(posting.id, picked[3], 'MyShift Mobile App');
           if (typeof window.renderAll === 'function') window.renderAll();
         }
-      }, 4200);
+      }, 6500);
     }
   }
 
@@ -582,7 +559,6 @@
     const posting = eng.openPostings.find(p => p.id === postingId);
     if (!posting || posting.status !== 'OPEN') return false;
 
-    // Prevent duplicate bid from same PE#
     if (posting.bids.some(b => b.pe === candidate.pe)) {
       return false;
     }
@@ -614,7 +590,6 @@
 
     posting.bids.push(bidEntry);
 
-    // If this is a manual user click in <24h FCFS mode, award immediately!
     if (posting.awardRule === 'FCFS' && sourceLabel === 'Instant Manual Claim') {
       finalizeHireBackAward(posting.id, 'FCFS_INSTANT');
       return true;
@@ -634,15 +609,12 @@
 
     const posting = eng.openPostings[idx];
 
-    // What if 0 bids were submitted when a Full-Shift window expires?
-    // Per PBA Art. 35 §2: Automatically split into First 4 Hours & Last 4 Hours Partial-Shift FCFS Hire-Backs!
     if (posting.bids.length === 0) {
       if (posting.blockType === 'FULL_SHIFT' && posting.category === 'OFFICER') {
         eng.openPostings.splice(idx, 1);
         splitUnfilledPostingIntoPartialBlocks(posting);
         return;
       }
-      // Otherwise reset timer for another cycle
       posting.secondsRemaining = BID_WINDOW_SECONDS;
       return;
     }
@@ -651,10 +623,8 @@
     const winner = sortedBids[0];
     const standbyBidders = sortedBids.slice(1);
 
-    // Remove from openPostings
     eng.openPostings.splice(idx, 1);
 
-    // Place winner into "The Books" schedule automatically!
     let placedUnit = posting.targetUnit;
     let placedDiv = posting.targetDiv;
     const assignBadge = posting.blockType === 'FIRST_4H'
@@ -674,14 +644,12 @@
         placedUnit = slot.unit;
         placedDiv = slot.div;
       }
-      // Save remaining supervisor bidders onto the FOPLC Art. 24 §4B Seniority Standby List!
       for (const sb of standbyBidders) {
         if (!eng.supervisorStandbyList.some(x => x.pe === sb.pe)) {
           eng.supervisorStandbyList.push(sb);
         }
       }
     } else {
-      // Find matching targetUnit first, or best open officer slot
       let targetRow = null;
       if (posting.targetUnit && app.officers[posting.targetDiv]) {
         const exact = app.officers[posting.targetDiv].find(r => r.unit === posting.targetUnit && !r.name);
@@ -715,7 +683,6 @@
         ? `Highest Supervisor Seniority (PE #${winner.pe}, FOPLC Art. 24 §4A)`
         : `Highest Eligible Seniority (PE #${winner.pe}, ${winner.bureau === 'OPS' ? 'Uniform Division Priority' : 'Detective Bureau'} — PBA Art. 35 §4)`);
 
-    // Build Individual Notifications sent to EVERY bidder
     const bidderReceipts = sortedBids.map((b, rankIdx) => ({
       name: b.name,
       pe: b.pe,
@@ -749,10 +716,8 @@
       eng.closedNotifications.pop();
     }
 
-    // Re-audit supervisors after placement
     auditSupervisorMinimums();
 
-    // Show celebratory zero-touch toast banner
     const otherNames = standbyBidders.length > 0
       ? standbyBidders.map(b => `${b.name} (#${b.pe})`).join(', ')
       : 'None (Sole Bidder)';
@@ -771,7 +736,6 @@
       msg: `[${posting.id}] Auto-Awarded ${assignBadge} (${posting.durationHrs}) in ${placedUnit} (${placedDiv}) to ${winner.name} (#${winner.pe}) [${whyWon}]. Notified all ${sortedBids.length} bidder(s).`
     });
 
-    // If additional shortages still exist on the shift, check if another posting is needed
     checkAndCreatePostingsForCurrentShortages();
 
     if (typeof window.renderAll === 'function') {
@@ -819,13 +783,11 @@
     const eng = ensureEngineState();
     if (!eng) return;
 
-    // 1. Check Patrol / Detective Shift Minimum Count (PBA Art. 35 §2–3)
     const count = getShiftCount();
     const min = app.shiftMin;
     const neededOfficers = Math.max(0, min - count);
 
     const activeOfficerPostings = eng.openPostings.filter(p => p.category === 'OFFICER');
-    // Count how many full-shift equivalents are already posted
     const postedOfficerSlots = activeOfficerPostings.reduce((acc, p) => {
       return acc + (p.blockType === 'FULL_SHIFT' || p.isCShiftTraining ? 1 : 0.5);
     }, 0);
@@ -839,17 +801,15 @@
         targetUnit: slot ? slot.unit : (triggerContext && triggerContext.unit) || 'OPEN',
         triggeredByName: (triggerContext && triggerContext.name) || 'Shift Minimum Deficit',
         triggeredByPe: (triggerContext && triggerContext.pe) || null,
-        triggerReason: (triggerContext && triggerContext.reason) || `Shift Count (${count}) dropped below Minimum (${min})`,
+        triggerReason: (triggerContext && triggerContext.reason) || `Shift Count (${count}) is below Minimum (${min})`,
         isCShiftTraining: Boolean(triggerContext && triggerContext.isCShiftTraining)
       });
     }
 
-    // If count was restored (e.g. officer returned to duty or min lowered), remove excess open officer postings
     if (neededOfficers === 0 && activeOfficerPostings.length > 0) {
       eng.openPostings = eng.openPostings.filter(p => p.category !== 'OFFICER');
     }
 
-    // 2. Check FOPLC Art. 24 Supervisor Minimums
     const supAudit = auditSupervisorMinimums();
     const activeSupPostings = eng.openPostings.filter(p => p.category === 'SUPERVISOR');
 
@@ -895,7 +855,6 @@
           finalizeHireBackAward(id, 'TIMER_EXPIRED');
         }
       } else {
-        // Lightweight live countdown update without full DOM rebuild flicker
         updateLiveTimerElements();
       }
     }, 1000);
@@ -905,18 +864,23 @@
     const eng = ensureEngineState();
     if (!eng) return;
     for (const p of eng.openPostings) {
-      const txtEl = document.getElementById(`hbTimerText-${p.id}`);
-      if (txtEl) {
-        txtEl.textContent = `${p.secondsRemaining}s`;
+      const pct = Math.max(0, Math.min(100, Math.round((p.secondsRemaining / p.secondsTotal) * 100)));
+      const ids = [
+        `hbTopTimerText-${p.id}`,
+        `hbTimerText-${p.id}`,
+        `hbMobTimerText-${p.id}`
+      ];
+      for (const elId of ids) {
+        const el = document.getElementById(elId);
+        if (el) el.textContent = `${p.secondsRemaining}s`;
       }
-      const barEl = document.getElementById(`hbTimerBar-${p.id}`);
-      if (barEl) {
-        const pct = Math.max(0, Math.min(100, Math.round((p.secondsRemaining / p.secondsTotal) * 100)));
-        barEl.style.width = `${pct}%`;
-      }
-      const mobTxtEl = document.getElementById(`hbMobTimerText-${p.id}`);
-      if (mobTxtEl) {
-        mobTxtEl.textContent = `${p.secondsRemaining}s`;
+      const barIds = [
+        `hbTopTimerBar-${p.id}`,
+        `hbTimerBar-${p.id}`
+      ];
+      for (const bId of barIds) {
+        const barEl = document.getElementById(bId);
+        if (barEl) barEl.style.width = `${pct}%`;
       }
     }
   }
@@ -1003,7 +967,6 @@
       return;
     }
 
-    // Move Supervisor to commandOffRoster
     eng.commandOffRoster.push({
       div,
       rowIdx,
@@ -1134,7 +1097,6 @@
     if (!eng) return;
     eng.noticeMode = newMode;
 
-    // Update any currently open postings to reflect the selected notice mode for seamless testing
     for (const p of eng.openPostings) {
       p.noticeMode = newMode;
       if (newMode === 'SHIFT_STARTED' && !eng.dutyChiefAuthorized) {
@@ -1213,7 +1175,6 @@
       if (app.loggedInPe === 'COD') {
         cand = EXTENDED_CANDIDATE_POOL.find(c => evaluateBidderEligibility(c, posting).eligible) || EXTENDED_CANDIDATE_POOL[0];
       } else {
-        // Look up logged-in officer
         const dirMatch = (typeof MASTER_OPERATIONS_DIRECTORY !== 'undefined')
           ? MASTER_OPERATIONS_DIRECTORY.find(o => o.pe === app.loggedInPe)
           : null;
@@ -1237,7 +1198,7 @@
   };
 
   // ===========================================================================
-  // 13. UI RENDERERS (TOP CONTROL STRIP, WORKSHEET CARD, MOBILE APP)
+  // 13. UI RENDERERS (TOP CONTROL STRIP + LIVE COUNTDOWN BANNER, WORKSHEET, APP)
   // ===========================================================================
   function ensureControlStripExists() {
     if (document.getElementById('hbZeroTouchControlBar')) return;
@@ -1258,7 +1219,8 @@
     const eng = ensureEngineState();
     const details = getNoticeModeDetails();
     const supAudit = auditSupervisorMinimums();
-    const openCount = eng.openPostings.length;
+    const openPostings = eng.openPostings;
+    const openCount = openPostings.length;
     const standbyCount = eng.supervisorStandbyList.length;
 
     const qBadges = DIV_KEYS.map(d => {
@@ -1271,23 +1233,81 @@
       ? `<span class="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-extrabold text-[10.5px]">⚡ ACTING COD: ${supAudit.actingCod.name} (#${supAudit.actingCod.pe}) [FOPLC Art. 25]</span>`
       : `<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-200 border border-blue-500/30 font-semibold text-[10.5px]">COD: ${supAudit.ltCount} LT / ${supAudit.sgtCount} SGT On Duty</span>`;
 
+    // Render any active countdown postings RIGHT AT THE TOP of the page so the user never misses the timer!
+    let topLiveCountdownsHtml = '';
+    if (openPostings.length > 0) {
+      topLiveCountdownsHtml = `
+        <div class="mt-2.5 pt-2.5 border-t border-blue-500/40 space-y-2">
+          ${openPostings.map(p => {
+            const sortedBids = sortBidsForPosting(p.bids, p);
+            const leader = sortedBids[0];
+            const pct = Math.max(0, Math.min(100, Math.round((p.secondsRemaining / p.secondsTotal) * 100)));
+            return `
+              <div class="p-3 rounded-xl bg-slate-950/95 border-2 ${p.awardRule === 'FCFS' ? 'border-amber-400' : 'border-emerald-400'} space-y-2 shadow-xl">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded-md font-mono font-black text-xs ${p.awardRule === 'FCFS' ? 'bg-amber-400 text-slate-950' : 'bg-emerald-400 text-slate-950'}">
+                      ⏱️ AUTO-AWARD IN <span id="hbTopTimerText-${p.id}">${p.secondsRemaining}s</span>
+                    </span>
+                    <span class="font-extrabold text-xs md:text-sm text-white">
+                      ${p.id}: Auto-Bidding Open for Unit ${p.targetUnit} (${p.targetDiv}) • ${p.blockType.replace('_', ' ')} (${p.durationHrs})
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    ${p.blockType === 'FULL_SHIFT' && p.category === 'OFFICER' ? `
+                      <button type="button" onclick="splitPostingToPartialsNow('${p.id}')" class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-bold cursor-pointer">
+                        ✂️ Split to 4h Blocks
+                      </button>
+                    ` : ''}
+                    <button type="button" onclick="toggleHbTimerPause()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold cursor-pointer">
+                      ${eng.timerPaused ? '▶ Resume Timer' : '⏸ Pause Timer'}
+                    </button>
+                    <button type="button" onclick="expirePostingNow('${p.id}')" class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-extrabold cursor-pointer shadow">
+                      ⏩ Expire &amp; Auto-Populate Now
+                    </button>
+                  </div>
+                </div>
+
+                <div class="hb-timer-bar-bg">
+                  <div id="hbTopTimerBar-${p.id}" class="hb-timer-bar-fill" style="width: ${pct}%;"></div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="text-slate-400 font-semibold text-[11px]">Live Incoming Bids (${sortedBids.length}):</span>
+                    ${sortedBids.map((b, idx) => `
+                      <span class="px-2 py-0.5 rounded font-mono text-[11px] ${idx === 0 ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 font-extrabold' : 'bg-slate-800 text-slate-300 border border-slate-700'}">
+                        ${idx === 0 ? '🏆 LEADER: ' : `#${idx + 1}: `}${b.name} (PE #${b.pe})
+                      </span>
+                    `).join('')}
+                  </div>
+                  <span class="text-[11px] text-emerald-300 font-semibold">
+                    🤖 No click needed — schedule auto-populates ${leader ? `${leader.name} (#${leader.pe})` : 'winner'} when timer hits 0s!
+                  </span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
     strip.innerHTML = `
       <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-2.5">
-        <!-- Left: Zero-Touch Notice Window Mode Selector (PBA Art. 35 §4 & FOPLC Art. 24 §4) -->
         <div class="flex flex-wrap items-center gap-2">
           <div class="flex items-center gap-1.5 pr-1">
-            <span class="w-2 h-2 rounded-full ${openCount > 0 ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'}"></span>
+            <span class="w-2.5 h-2.5 rounded-full ${openCount > 0 ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'}"></span>
             <span class="text-xs font-extrabold tracking-tight text-white uppercase">Zero-Touch Hire-Back Engine:</span>
           </div>
 
           <button type="button" onclick="setHbNoticeMode('ADVANCE_24PLUS')" class="hb-mode-pill ${details.mode === 'ADVANCE_24PLUS' ? 'active-24plus' : 'inactive'}" title="Outside 24 Hours before shift start: Collects bids and auto-awards to highest seniority (lowest PE# with Uniform priority) when window expires">
             <span>🕒 ≥ 24h Notice</span>
-            <span class="opacity-80 font-normal">(Seniority Bid Pool)</span>
+            <span class="opacity-80 font-normal">(12s Auto-Bid Pool → Seniority)</span>
           </button>
 
           <button type="button" onclick="setHbNoticeMode('SHORT_UNDER24')" class="hb-mode-pill ${details.mode === 'SHORT_UNDER24' ? 'active-under24' : 'inactive'}" title="Inside 24 Hours before shift start: Broadcasts via Radio/MDC/App and auto-populates First-Come, First-Served (includes DB & Exempt)">
             <span>⚡ &lt; 24h Short Notice</span>
-            <span class="opacity-80 font-normal">(Instant FCFS)</span>
+            <span class="opacity-80 font-normal">(4s Instant FCFS)</span>
           </button>
 
           <button type="button" onclick="setHbNoticeMode('SHIFT_STARTED')" class="hb-mode-pill ${details.mode === 'SHIFT_STARTED' ? 'active-started' : 'inactive'}" title="Shift already started: FOPLC Art. 24 §4D freezes hire-backs unless Duty Chief authorizes">
@@ -1302,7 +1322,6 @@
           ` : ''}
         </div>
 
-        <!-- Right: FOPLC Art. 24 & 25 Command Minimums & Standby Status -->
         <div class="flex flex-wrap items-center gap-2 text-xs">
           ${codBadge}
           <div class="flex items-center gap-1" title="FOPLC Art. 24 §2B: Minimum 1 Uniform Sergeant per Quadrant (4 total)">
@@ -1323,10 +1342,10 @@
         </div>
         <div class="flex items-center gap-3 text-[10.5px] text-slate-400 font-mono">
           <span>Sim Clock: <strong class="text-slate-200">${details.simClockNote}</strong></span>
-          <span>•</span>
-          <span>Tip: Click <strong>▾</strong> on any Officer or Supervisor (LT/SGT) to mark Sick and watch the zero-touch engine run!</span>
         </div>
       </div>
+
+      ${topLiveCountdownsHtml}
     `;
   }
 
@@ -1422,10 +1441,10 @@
     const recentClosed = eng.closedNotifications.slice(0, 2);
 
     if (openPostings.length > 0) {
-      hbBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-600 dark:text-red-300 animate-pulse';
-      hbBadge.textContent = `${openPostings.length} Active Bid${openPostings.length > 1 ? 's' : ''}`;
+      hbBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300 animate-pulse';
+      hbBadge.textContent = `⏱️ ${openPostings.length} Auto-Bidding`;
     } else if (count < min || supAudit.needsSupervisorHireBack) {
-      hbBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300';
+      hbBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-600 dark:text-red-300';
       hbBadge.textContent = `Shortage Detected`;
     } else {
       hbBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300';
@@ -1434,114 +1453,55 @@
 
     let html = '<div class="space-y-2 mt-1">';
 
-    // 1. Render Open Hire-Back Postings
     for (const p of openPostings) {
       const sortedBids = sortBidsForPosting(p.bids, p);
-      const leader = sortedBids[0];
       const pct = Math.max(0, Math.min(100, Math.round((p.secondsRemaining / p.secondsTotal) * 100)));
-
-      // Pick quick candidate buttons to add bids or claim
-      const quickCandidates = EXTENDED_CANDIDATE_POOL.filter(c => {
-        if (p.category === 'SUPERVISOR') return c.role === 'LT' || c.role === 'SGT';
-        if (p.bureau === 'DB') return c.bureau === 'DB';
-        return c.role !== 'LT' && c.role !== 'SGT';
-      }).slice(0, 4);
 
       html += `
         <div class="p-2.5 rounded-xl bg-slate-900 text-slate-100 border ${p.awardRule === 'FCFS' ? 'border-amber-500/60' : 'border-blue-500/60'} space-y-2 shadow-md">
           <div class="flex items-center justify-between gap-1">
-            <div class="flex items-center gap-1.5">
-              <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-extrabold ${p.awardRule === 'FCFS' ? 'bg-amber-400 text-slate-950' : 'bg-blue-600 text-white'}">
-                ${p.id} • ${p.awardRule === 'FCFS' ? '⚡ <24h FCFS' : '🕒 ≥24h SENIORITY'}
-              </span>
-              <span class="text-[11px] font-bold text-white">
-                Unit ${p.targetUnit} (${p.targetDiv}) • ${p.blockType.replace('_', ' ')} (${p.durationHrs})
-              </span>
-            </div>
-            ${p.status === 'OPEN' ? `
-              <span class="font-mono text-[11px] font-extrabold text-emerald-300">
-                Auto-Award in <span id="hbTimerText-${p.id}">${p.secondsRemaining}s</span>
-              </span>
-            ` : `
-              <span class="px-1.5 py-0.5 rounded bg-red-500/30 text-red-200 text-[10px] font-bold">
-                🔒 Held (Duty Chief)
-              </span>
-            `}
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-extrabold ${p.awardRule === 'FCFS' ? 'bg-amber-400 text-slate-950' : 'bg-blue-600 text-white'}">
+              ${p.id} • ${p.awardRule === 'FCFS' ? '⚡ <24h FCFS' : '🕒 ≥24h SENIORITY'}
+            </span>
+            <span class="font-mono text-[11px] font-extrabold text-emerald-300">
+              Auto-Award in <span id="hbTimerText-${p.id}">${p.secondsRemaining}s</span>
+            </span>
           </div>
 
-          <div class="text-[10.5px] text-slate-300 leading-snug">
-            ${p.triggerReason}
+          <div class="hb-timer-bar-bg">
+            <div id="hbTimerBar-${p.id}" class="hb-timer-bar-fill" style="width: ${pct}%;"></div>
           </div>
 
-          ${p.status === 'OPEN' ? `
-            <div class="hb-timer-bar-bg">
-              <div id="hbTimerBar-${p.id}" class="hb-timer-bar-fill" style="width: ${pct}%;"></div>
-            </div>
-          ` : ''}
-
-          <!-- Collected Bids List -->
           <div class="p-2 rounded-lg bg-slate-950/90 border border-slate-800 space-y-1">
             <div class="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
-              <span>Collected Bids (${sortedBids.length}):</span>
-              <span>${p.awardRule === 'FCFS' ? 'Sorted by Timestamp (FCFS)' : 'Sorted by Seniority (Lowest PE# + Uniform Priority)'}</span>
+              <span>Live Incoming Officer Bids (${sortedBids.length}):</span>
+              <span>Auto-populates at 0s</span>
             </div>
-            ${sortedBids.length === 0 ? `
-              <div class="text-[10.5px] text-amber-300 italic py-0.5">No bids yet — if 0 bids at expiration, auto-splits into First 4h &amp; Last 4h blocks (Art. 35 §2).</div>
-            ` : sortedBids.map((b, idx) => `
+            ${sortedBids.map((b, idx) => `
               <div class="flex items-center justify-between text-[10.5px] font-mono px-1.5 py-0.5 rounded ${idx === 0 ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30' : 'text-slate-400'}">
                 <span>${idx === 0 ? '🏆 LEADER: ' : `#${idx + 1} Standby: `}${b.name} (PE #${b.pe})</span>
-                <span class="text-[9.5px]">${b.badgeLabel} • ${b.bidTime}</span>
+                <span class="text-[9.5px]">${b.badgeLabel}</span>
               </div>
             `).join('')}
-          </div>
-
-          <!-- Instant Action Controls -->
-          <div class="flex flex-wrap items-center justify-between gap-1.5 pt-0.5">
-            <div class="flex flex-wrap gap-1">
-              ${quickCandidates.map(c => {
-                const fullIdx = EXTENDED_CANDIDATE_POOL.indexOf(c);
-                const alreadyBid = p.bids.some(b => b.pe === c.pe);
-                return `
-                  <button type="button" onclick="userBidOrClaimPosting('${p.id}', ${fullIdx})" ${alreadyBid ? 'disabled' : ''} class="px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition ${alreadyBid ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-slate-800 hover:bg-blue-600 text-slate-200 hover:text-white border border-slate-700'}">
-                    ${alreadyBid ? '✓ ' : '+ '}${c.name.split(',')[0]} (#${c.pe})
-                  </button>
-                `;
-              }).join('')}
-            </div>
-
-            <div class="flex items-center gap-1">
-              ${p.blockType === 'FULL_SHIFT' && p.category === 'OFFICER' ? `
-                <button type="button" onclick="splitPostingToPartialsNow('${p.id}')" class="px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-bold cursor-pointer" title="Simulate Unfilled Full-Shift -> Split into First 4 Hours & Last 4 Hours (Art. 35 §2)">
-                  ✂️ 4h Split
-                </button>
-              ` : ''}
-              <button type="button" onclick="toggleHbTimerPause()" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold cursor-pointer">
-                ${eng.timerPaused ? '▶ Resume' : '⏸ Pause'}
-              </button>
-              <button type="button" onclick="expirePostingNow('${p.id}')" class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-extrabold cursor-pointer shadow">
-                ⏩ Expire &amp; Auto-Award Now
-              </button>
-            </div>
           </div>
         </div>
       `;
     }
 
-    // 2. Render Recent Auto-Award & All-Bidder Notifications
     if (recentClosed.length > 0) {
       for (const n of recentClosed) {
         html += `
           <div class="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/40 text-[11px] space-y-1">
             <div class="flex items-center justify-between">
               <span class="font-extrabold text-emerald-600 dark:text-emerald-300">
-                ✅ ${n.id} Auto-Awarded → ${n.winnerName} (#${n.winnerPe}) in ${n.unit} (${n.div})
+                ✅ ${n.id} Auto-Populated → ${n.winnerName} (#${n.winnerPe}) in ${n.unit} (${n.div})
               </span>
               <span class="font-mono text-[10px] text-[var(--text-muted)]">${n.closedAt}</span>
             </div>
             <div class="text-[10px] text-[var(--text-muted)]">${n.whyWon}</div>
             <div class="pt-1 border-t border-emerald-500/20 space-y-0.5">
               <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                📢 Automated Notifications Dispatched to All ${n.totalBids} Bidder(s):
+                📢 Automated Notifications Sent to All ${n.totalBids} Bidder(s):
               </div>
               ${n.bidderReceipts.map(r => `
                 <div class="flex items-center justify-between text-[10px] font-mono">
@@ -1565,7 +1525,9 @@
 
   function appendMobileAppHireBackCenter() {
     const container = document.getElementById('mobileAppBody');
-    if (!container || document.getElementById('mobileHbLiveCenter')) return;
+    if (!container) return;
+    const existing = document.getElementById('mobileHbLiveCenter');
+    if (existing) existing.remove();
 
     const eng = ensureEngineState();
     const details = getNoticeModeDetails();
@@ -1581,77 +1543,51 @@
     let html = `
       <div class="flex items-center justify-between px-1">
         <span class="text-[10px] font-bold uppercase tracking-wider text-amber-300">
-          🔔 Live Hire-Back Alerts (${details.mode === 'ADVANCE_24PLUS' ? '≥24h Seniority' : '<24h FCFS'})
+          🔔 Zero-Touch Hire-Back Alerts (${details.mode === 'ADVANCE_24PLUS' ? '≥24h Seniority' : '<24h FCFS'})
         </span>
-        <span class="px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 font-mono text-[9.5px]">
-          Zero-Touch
+        <span class="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[9.5px]">
+          Auto-Award
         </span>
       </div>
     `;
-
-    // Quick C-Shift Morning Training button for active officer
-    html += `
-      <button onclick="triggerCShiftTrainingLeave('${findOfficerByPe(activePe)?.div || 'NW'}', '${findOfficerByPe(activePe)?.unit || 'A152'}')" class="w-full p-2.5 rounded-xl bg-indigo-950/70 hover:bg-indigo-900/70 border border-indigo-500/40 flex items-center justify-between text-left transition cursor-pointer">
-        <div>
-          <div class="font-bold text-indigo-200 text-[11px]">🎓 Morning In-Service Training (Art. 34 §7)</div>
-          <div class="text-[9.5px] text-slate-400">Takes Last 4h off &amp; triggers Last-4h-Only Hire-Back (Art. 35 §2)</div>
-        </div>
-        <span class="text-xs text-indigo-300 font-bold">→</span>
-      </button>
-    `;
-
-    if (openPostings.length === 0 && recentClosed.length === 0) {
-      html += `
-        <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-400 text-center">
-          No open Hire-Back alerts right now. Mark an officer Sick above to trigger an automatic Hire-Back broadcast!
-        </div>
-      `;
-    }
 
     for (const p of openPostings) {
       const sortedBids = sortBidsForPosting(p.bids, p);
       const leader = sortedBids[0];
 
       html += `
-        <div class="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/40 space-y-2">
+        <div class="p-3 rounded-2xl bg-amber-500/15 border-2 border-amber-400 space-y-2">
           <div class="flex items-center justify-between">
             <span class="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-extrabold text-[10px]">
               🚨 ${p.id}: ${p.targetUnit} (${p.targetDiv}) • ${p.durationHrs}
             </span>
-            <span id="hbMobTimerText-${p.id}" class="font-mono text-[11px] font-bold text-emerald-300">${p.secondsRemaining}s</span>
+            <span class="px-2 py-0.5 rounded bg-emerald-500 text-slate-950 font-mono text-[11px] font-black">
+              ⏱️ <span id="hbMobTimerText-${p.id}">${p.secondsRemaining}s</span>
+            </span>
           </div>
           <div class="text-[10.5px] text-slate-200">
-            <strong>Rule:</strong> ${p.awardRule === 'FCFS' ? 'Instant First-Come, First-Served (<24h / Partial)' : 'Seniority Bid Pool (≥24h — Lowest PE# Wins at Cutoff)'}
+            <strong>Auto-Award Rule:</strong> ${p.awardRule === 'FCFS' ? 'Instant First-Come, First-Served (<24h)' : 'Seniority Bid Pool (≥24h — Lowest PE# Wins at 0s)'}
           </div>
           ${leader ? `
             <div class="text-[10px] font-mono text-emerald-300 bg-slate-900/90 px-2 py-1 rounded border border-slate-800">
-              Current Leader: ${leader.name} (#${leader.pe}) • ${sortedBids.length} Bid(s)
+              🏆 Current Leader: ${leader.name} (#${leader.pe}) • ${sortedBids.length} Bid(s)
             </div>
           ` : ''}
 
           ${markedOffSelf ? `
             <div class="w-full p-2 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 text-[10px] font-bold text-center">
-              🚫 Ineligible to Bid (You Marked Off This Shift — PBA Art. 35 §4)
+              🚫 You Marked Off This Shift — Blocked per PBA Art. 35 §4
             </div>
           ` : ''}
-
-          <div class="grid grid-cols-2 gap-1.5">
-            <button onclick="userBidOrClaimPosting('${p.id}', 0)" class="p-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10.5px] text-center cursor-pointer">
-              ${p.awardRule === 'FCFS' ? '⚡ Claim (Patino #1742)' : '🙋 Bid (Patino #1742)'}
-            </button>
-            <button onclick="expirePostingNow('${p.id}')" class="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10.5px] text-center cursor-pointer">
-              ⏩ Expire &amp; Award
-            </button>
-          </div>
         </div>
       `;
     }
 
     for (const n of recentClosed) {
       html += `
-        <div class="p-3 rounded-2xl bg-emerald-950/50 border border-emerald-500/40 space-y-1.5">
+        <div class="p-3 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 space-y-1.5">
           <div class="flex items-center justify-between">
-            <span class="text-[10px] font-extrabold text-emerald-300">📢 BID RESULT SENT TO ALL BIDDERS</span>
+            <span class="text-[10px] font-extrabold text-emerald-300">📢 AUTO-AWARD NOTIFICATION SENT</span>
             <span class="font-mono text-[9.5px] text-slate-400">${n.id}</span>
           </div>
           <div class="text-[11px] font-bold text-white">
@@ -1662,17 +1598,31 @@
       `;
     }
 
+    html += `
+      <button onclick="triggerCShiftTrainingLeave('${findOfficerByPe(activePe)?.div || 'NW'}', '${findOfficerByPe(activePe)?.unit || 'A152'}')" class="w-full p-2.5 rounded-xl bg-indigo-950/70 hover:bg-indigo-900/70 border border-indigo-500/40 flex items-center justify-between text-left transition cursor-pointer">
+        <div>
+          <div class="font-bold text-indigo-200 text-[11px]">🎓 Morning In-Service Training (Art. 34 §7)</div>
+          <div class="text-[9.5px] text-slate-400">Takes Last 4h off &amp; triggers Last-4h-Only Hire-Back (Art. 35 §2)</div>
+        </div>
+        <span class="text-xs text-indigo-300 font-bold">→</span>
+      </button>
+    `;
+
     section.innerHTML = html;
-    container.appendChild(section);
+    // Insert right at the top of mobileAppBody if an open posting or recent award exists!
+    if (openPostings.length > 0 || recentClosed.length > 0) {
+      container.insertBefore(section, container.firstChild);
+    } else {
+      container.appendChild(section);
+    }
   }
 
   // ===========================================================================
   // 14. HOOK INTO CORE APPLICATION FUNCTIONS
   // ===========================================================================
   function hookHireBackEngine() {
-    ensureEngineState();
+    if (!ensureEngineState()) return;
 
-    // 1. Wrap executeApprovedLeaveMove so officer mark-offs automatically trigger the 24h / <24h Hire-Back engine
     const origExecuteLeave = window.executeApprovedLeaveMove;
     if (typeof origExecuteLeave === 'function') {
       window.executeApprovedLeaveMove = function (div, unit, leaveConfig) {
@@ -1699,7 +1649,6 @@
       };
     }
 
-    // 2. Wrap restoreOfficerFromDayOff so returning to duty cleans up open postings if shift is back at minimum
     const origRestoreOfficer = window.restoreOfficerFromDayOff;
     if (typeof origRestoreOfficer === 'function') {
       window.restoreOfficerFromDayOff = function (div, homeUnit) {
@@ -1712,7 +1661,6 @@
       };
     }
 
-    // 3. Wrap changeMinimum so raising/lowering the minimum automatically opens/closes Hire-Back postings
     const origChangeMin = window.changeMinimum;
     if (typeof origChangeMin === 'function') {
       window.changeMinimum = function (delta) {
@@ -1730,7 +1678,6 @@
       };
     }
 
-    // 4. Wrap openOfficerActionPopover to add "🎓 Morning In-Service Training (Last 4h Off — Art. 34 §7)"
     const origOpenPopover = window.openOfficerActionPopover;
     if (typeof origOpenPopover === 'function') {
       window.openOfficerActionPopover = function (event, mode, div, unit) {
@@ -1752,7 +1699,6 @@
       };
     }
 
-    // 5. Wrap loadActiveDateAndShift so switching shift/date resets active postings for that view cleanly
     const origLoadShift = window.loadActiveDateAndShift;
     if (typeof origLoadShift === 'function') {
       window.loadActiveDateAndShift = function () {
@@ -1767,7 +1713,6 @@
       };
     }
 
-    // 6. Wrap renderAll so our Control Strip, FOPLC Command Rows, Hire-Back Card, and Mobile App Center stay synced
     const origRenderAll = window.renderAll;
     if (typeof origRenderAll === 'function') {
       window.renderAll = function () {
@@ -1780,12 +1725,15 @@
       };
     }
 
-    // Initial render pass
-    renderControlStrip();
-    renderEnhancedCommandRows();
-    renderEnhancedHireBackCard();
-    appendMobileAppHireBackCenter();
-    ensureTimerRunning();
+    // Also run after persistence-print-export finishes restoring any saved state!
+    setTimeout(() => {
+      checkAndCreatePostingsForCurrentShortages();
+      renderControlStrip();
+      renderEnhancedCommandRows();
+      renderEnhancedHireBackCard();
+      appendMobileAppHireBackCenter();
+      ensureTimerRunning();
+    }, 50);
   }
 
   if (document.readyState === 'loading') {
