@@ -1,14 +1,15 @@
 # RULES.md — FWPD Scheduling Business Rules, CBA Reference & Engineering Guardrails
 
-**Sources Analyzed:**
-- Runtime Codebase: `index.html` (12,893 lines, active branch `macc-dev`)
-- Patrolmen CBA: `PBA_Contract_2026.md` (840 lines — full-time commissioned officers below rank of Sergeant)
-- Supervisors CBA: `FOPLC_Contract_2026.md` (466 lines — Sergeants and Lieutenants)
+**Sources Consolidated:**
+- Runtime Codebase: `index.html` (12,893 lines, active branch `macc-dev` / `main`)
+- Patrolmen CBA (below Sergeant): `PBA_Contract_2026.md` (archived in git `e91d318`)
+- Supervisors CBA (Sergeants & Lieutenants): `FOPLC_Contract_2026.md` (archived in git `e91d318`)
+- Prior Rule Summary: `CONTRACT_RULES.md` (consolidated here; archived in git `10bdf32`)
 
 This document strictly distinguishes between:
 1. **Implemented Rules** enforced today in `index.html`,
-2. **Contractual Rules & Gap Analysis** comparing `PBA_Contract_2026.md` and `FOPLC_Contract_2026.md` against current software behavior, and
-3. **Engineering Guardrails** required for safe development on `macc-dev`.
+2. **Consolidated CBA Reference & Gap Analysis** combining `PBA_Contract_2026.md`, `FOPLC_Contract_2026.md`, and `CONTRACT_RULES.md` against current software behavior, and
+3. **Engineering Guardrails** required for safe, token-efficient development on `macc-dev`.
 
 ---
 
@@ -112,15 +113,72 @@ When `count >= min`, for each division (`NW`, `NE`, `SW`, `SE`) and each distric
 | **Union Time Bank (UTB)** | **2,000 hrs/yr** (+500 carryover, **2,500** max). Pres/VP/Treas/Sec bypass min anytime; Board members bypass min with `≥15 days` notice (else subject to min); Pres 50/50 flex (`PBA` Art. 16 L175-190). | **800 hrs/yr** city + ≤300 member-donated (**2,000** max); **all usage subject to maintaining minimum manpower** (`FOPLC` Art. 7 §2 L45-46). | **Diverges:** `UTB` sets `requiresAboveMin: false` globally for all officers without checking rank/union role, 15-day notice, or UTB balance. |
 | **Sick, Parental, Military, FMLA** | Sick: ≥270 days, 1-yr exhaustion (`PBA` Art. 50 L615-618). Parental: 15 days (`PBA` Art. 46 §2 L588). Military: 15 days/120 hrs; **`>15` consecutive days do NOT count against shift count** (`PBA` Art. 47 §5 L600, Art. 37 §4 L474). | Sick: 270-day disability trigger, 1-yr exhaustion; **sick/light-duty supervisors void holiday/HB/SE bids unless released 15 days prior** (`FOPLC` Art. 26 L346-348). Military: 15 days/120 hrs (`FOPLC` Art. 16 L216). | **Partial:** `SICK` bypasses min; static `[SICK LEAVE]`, `[LIGHT DUTY - HOD]`, `[MILITARY]` entries render in `sickAndLeave`. No 270-day, 15-day release, or military exclusion tracking. |
 | **Exchange of Work Time** | Max 160 hrs (`5/2`) / 170 hrs (`4/2`) = 20 days/yr; dates within **30 days**; submit ≥24hr to COD (2 emergency `<24hr` exceptions/yr) (`PBA` Art. 38 L479-489). | Identical limits & 30-day rule (`FOPLC` Art. 19 L240-247; Non-FLSA exchange carryover `FOPLC` Art. 20 §2 L252). | **Static Text Only:** `[WORKING EXCH]` appears in `trainingAndSpecial`; no exchange workflow. |
-| **Overtime, FLSA & Non-FLSA** | 7-day work period starting Sun A-Shift: `>42.5 hrs` (`4/2 8.5hr`) or `>40 hrs` (`4/3 10hr`, `5/2 8hr`) at `1.5x` (`PBA` Art. 39 §1 L491-494). 400-hr Non-FLSA carryover cap (`PBA` Art. 48 L608); 160-hr transfer cap (`PBA` Art. 49 L611). `1 hr` FLSA/Non-FLSA spot usage above min (`PBA` Art. 39 §2 L497). | `1.5x` FLSA OT (`FOPLC` Art. 28 §1 L357); 400-hr Non-FLSA paydown Jan 31 (`§2` L359); 160-hr transfer cap (`FOPLC` Art. 20 §1 L250); Call-out `+2hr`/`+1hr` (`FOPLC` Art. 23 §2 L300); Court `2.0x` min 1 hr (`FOPLC` Art. 21 §1 L257). | **Not Implemented:** `DAY_OFF_FLSA` gates on `count > min`; no hour bank balances or payroll calculations exist. |
+| **Overtime, FLSA & Non-FLSA** | 7-day work period starting Sun A-Shift: `>42.5 hrs` (`4/2 8.5hr`) or `>40 hrs` (`4/3 10hr`, `5/2 8hr`) at `1.5x` (`PBA` Art. 39 §1 L491-494). 400-hr Non-FLSA carryover cap paid down by **Feb 28** (`PBA` Art. 48 L608); 160-hr transfer cap (`PBA` Art. 49 L611). `1 hr` FLSA/Non-FLSA spot usage above min (`PBA` Art. 39 §2 L497). | `1.5x` FLSA OT (`FOPLC` Art. 28 §1 L357); 400-hr Non-FLSA paydown submitted Jan 15 / paid **Jan 31** (`§2` L359); 160-hr transfer cap (`FOPLC` Art. 20 §1 L250); Call-out `+2hr`/`+1hr` (`FOPLC` Art. 23 §2 L300); Court `2.0x` min 1 hr (`FOPLC` Art. 21 §1 L257). | **Not Implemented:** `DAY_OFF_FLSA` gates on `count > min`; no hour bank balances or payroll calculations exist. |
+
+---
+
+### 2.2 Consolidated CBA Detailed Reference *(Absorbed from `PBA_Contract_2026.md`, `FOPLC_Contract_2026.md` & `CONTRACT_RULES.md`)*
+
+#### 2.2.1 Shift Schedules, Flexing, Command (COD) & Exchanges
+- **PBA Schedules & Units:**
+  - **Uniform Operations (`4/2`, `8.5 hr`):** A `0600–1430`, B `1400–2230`, C `2200–0630` (`Art. 34 §1`).
+  - **Investigative / DB (`Art. 34 §§2–3`, `Art. 22 §1G`):** A (`5/2` Mon–Fri `8.0 hr`, `0800–1600` or `0700–1500`; Sat/Sun duty grants 1 day off week prior + 1 day off week following at employee discretion subject to min count; Juvenile Aid counts toward DB A-shift min on weekends/holidays only), B (`4/2` `8.5 hr` `1500–2330`), C (`4/2` `8.5 hr` `2300–0730`).
+  - **Specialty Schedules:** **SRO** (`Art. 24 §§4,7–10`): A-shift `5/2` Mon–Fri `0700–1500`; redeployed to Ops Uniform Patrol district car within 7 days after school ends (except ≤2 for FWCS summer needs), returning earlier of Transition Day or 7 days pre-school. **Hit-Skip** (`Art. 25 §§2–3`): ≥3 officers, `5/2` Mon–Fri `8.0 hr`. **Crime Scene** (`Art. 26 §§3,6`): `5/2` (`A 0800–1600`, `B 1600–2400`, `Mid 1800–0200`); 2-wk call-out rotation (`2` techs + trainees + `1` supervisor). **K-9** (`Art. 23 §§4–6`): Ops A/B/C or Vice/Narcotics exempt; `+4 hr` regular pay per 7-day cycle for K-9 maintenance/care.
+  - **Exempt & Flexing (`Art. 29`, `Art. 34 §§4–6`):** Max `74` exempt PBA roles (none in IA). Employee-initiated shift flex max `±2 hrs` (>2 hrs voluntary w/ approval), requires Supervisor/Cmdr/DC/Chief plan approval; no make-work, school/childcare/sports/fitness-only flexing, or min-count impact.
+  - **C-Shift → A-Shift Training (`Art. 34 §7` & `FOPLC Art. 10 §5`):** Marked off last `4 hrs` of prior C-shift; may mark off first half (`4.5 hr` Ops / `4.0 hr` DB) from banked time.
+  - **Vehicle Repair (`PBA Art. 39 §3`, `FOPLC Art. 21 §3`):** C-shift/directed off-duty vehicle maintenance when shop closed compensated under OT articles.
+- **FOPLC Schedules, COD & Training Pay:**
+  - **Rotations (`Art. 10 §§1–3`):** Uniform repeating `6-day` (`4/2`, `8.5 hr`); Investigative/Admin repeating `7-day` (`5/2`, `8.0 hr`). Emergency hour changes only when unforeseen manpower above min cannot be otherwise met.
+  - **Det. Sgt Weekend On-Call (`Art. 21 §4`):** `+2 hr` base pay per weekend on-call day when no Det. Sgt is on duty.
+  - **Commander of the Day (`Art. 25`):** When Capt/Lt absent, **senior Sgt** becomes COD and **cannot defer**; paid `+2 hr/day` (`+1 hr` if `≤4 hrs`, or `1 hr` each if two Sgts share COD).
+  - **Supervisory Training Pay (`Art. 21 §2`):** `+2.5 hr OT/day` when training a new Sgt (`≥15` working days; trainee doesn't affect div min) or Lt (`≥8` working days).
+- **Exchange of Work Time (`PBA Art. 38 §§1–4`, `Art. 16 §6`, `Art. 47 §3`; `FOPLC Art. 19 §§1–3`, `Art. 20 §2`, `Art. 16 §3`):**
+  - Like-for-like only (Uniform↔Uniform, DB↔DB), max **`160 hrs`** (`5/2`) or **`170 hrs`** (`4/2`) = 20 days/yr (holidays excluded).
+  - Dates must be within **`30 days`**; submit ≥`24 hrs` prior to COD (`PBA`: `2` emergency `<24hr` exceptions/yr). Military drill days may be exchanged against RDOs in the prior/following rotation.
+  - **FOPLC >400-hr Non-FLSA Exchange Cap (`Art. 20 §2`):** Non-FLSA hours earned at the 400-hr cap via exchange are logged as "exchanged time" and forfeited if unused before the final paycheck of the year received (or next year if donated after final check).
+
+#### 2.2.2 Seniority, Bidding, Probation & Temporary Assignments
+- **PBA Seniority & Attrition (`Art. 21 §§1–3`, `Art. 9 §§1–3`):** Continuous FWPD appointment date; tiebreak alphabetical by last name at appointment. Broken only by quit (>6 mo), 12-mo layoff, or discharge. Layoffs inverse seniority w/ ≥4 wks union notice; recalls direct seniority.
+- **PBA Probation & Job Bidding (`Art. 21 §2`, `Art. 22 §§1–3`):** 12 mo (`6 mo` supervised + `6 mo` unsupervised; bid-eligible in month 6). Two-phase award: **Primary** (Div/Shift/Bureau) + **Secondary** (section or standing district bid car `A–C, E–G, I–L, M–O` + new annexed districts). Specialized units (K-9, SRO, CS, Hit-Skip) bid unit-first. Crime Suppression & Crimes Against Persons exempt (excl. Dec 31, 2004 grandfathered; open Crime Suppression spots offered to Property Crimes detectives first, else bid to A-shift DB). Intranet posting `7 cal days`; max `3` simultaneous bids / **`3 awarded bids/yr`**; suspended `>30 days` barred. Trial rescission **`10 cal days`** (`15 cal days` post-training + `15-day` extension). Displaced officers bump junior in div/section (else B-shift Uniform) with 6-mo re-establishment return rights; K-9 & SRO never inverse force-filled.
+- **FOPLC Seniority & Bidding (`Art. 9 §§1,3,4`):** Most recent Merit Commission Sgt/Lt appointment date; tiebreak Merit Promotion List rank. Post vacancies within `15 cal days` (Ops Sgt: Div/Sec/Shift/Rank; DB: Div/Shift/Rank after optional same-div lateral by seniority; Lt: Div/Shift/Rank); start ≤`21 days`; **`10 cal days`** rescission (delayed to first return workday if on FMLA); displaced/demoted/disciplined Sgts temp-assigned by Asst Chief to Uniform A/B/C until bid (cannot inverse disciplined Sgt back to same job). **Exempt supervisors:** max `25% + 1`, `≥3 mo` in rank (excl. IA/Academy/CS/Spillman), 5-day notice, `7-day` rescission. On-call extra-duty ties resolved by seniority (excl. PIO).
+- **Temporary & Intra-Shift Assignments:**
+  - **PBA (`Art. 28`):** Max **`8`** dept-wide, **`90 cal days/yr`** (`160 days` for 1 Academy instructor & up to 2 SROs). Intra-shift motor/guard/desk/supply/bike/foot assignments use **inverse seniority**, moving **unbid officers first**.
+  - **FOPLC (`Art. 10 §4`):** Max **`4`** supervisors dept-wide, max **`1`** per Shift/Div, **`90 cal days / 12 mo`** (`160` Academy / `180` SRO), `≥3 mo` in rank (excl. IA/Academy/CS/Spillman).
+
+#### 2.2.3 Minimum Staffing, Exclusions, Floating, Hire-Backs & Special Events
+- **Minimum Counts & Exclusions:**
+  - **PBA (`Art. 37`, `Art. 23 §8`, `Art. 24 §6`, `Art. 16 §§1,4`, `Art. 45`, `Art. 47 §5`):** Posted **May 1** & **Oct 1**; Day after Thanksgiving = **`1/2`** min for `5/2` & `4/3`; Special Events max `+2` min increase. Excluded from daily/holiday min counts: **K-9**, **SRO** (*unless* working a holiday exchange for an inversed officer, when they count toward min & patrol a district), and **Military Leave `>15` consecutive days**. **UTB** (`2,000 hr/yr` + `500` carryover = `2,500` max): Pres works `50/50` flex; Pres/VP/Treas/Sec bypass min anytime; Board members bypass w/ `≥15 days` notice; all others subject to min. **Extended Bereavement**: up to `5` vac/pers days + up to `4` completion days exempt from min.
+  - **FOPLC (`Art. 24 §2`, `Art. 21 §2`, `Art. 17D`, `Art. 7 §2`):** **4 Uniform Sgts (1/quadrant) + 1 Lt (`5` total)**. If `0` Lt works: initiate Lt HB; if unfilled and `≥5` Sgts work, senior Sgt becomes COD; if only `4` Sgts work, initiate Sgt HB for COD while senior working Sgt acts as COD. Newly promoted Sgt `15-day` training doesn't affect min. Bereavement extended `5` days exempt from min; all FOPLC UTB (`800 hr` city + `≤300` member-donated = `2,000` max) is subject to min.
+- **District Floating Priority (`PBA Art. 37 §5`):** 1) Officers **not bid to the shift** float first (regardless of seniority) → 2) Officers **bid to the shift** by inverse seniority → 3) Standing **Union bid cars NEVER float**.
+- **Hire-Backs (`1.5x`):**
+  - **PBA (`Art. 35`):** Self-mark-off excluded (cannot HB to shift marked off). **Uniform:** `≥24hr` seniority w/ Uniform Div/Shift priority → `<24hr` radio/in-car FCFS dept-wide (incl. Detectives & Gang/Narcotics). **DB:** `≥24hr` DB seniority → `<24hr` DB FCFS. **Partial (`4 hr` min FCFS):** first 4, last 4, or both if full-shift unfilled; C-shift AM-training skips full-shift and offers last 4 hrs only.
+  - **FOPLC (`Art. 24`, `Art. 26`):** `≥24hr` seniority w/ Uniform Div & primary quadrant pref → `<24hr` radio/in-car/phone FCFS; subsequent HBs call denied supervisors sequentially (1 call to FLSA phone before re-posting). Partial HB **only** when Lt absent `< full shift`. **Stops once shift starts unless Duty Chief authorizes.** No inverse seniority for regular HB. Sick/light-duty bid void unless released by award date (`15 days` prior).
+- **Special Events (`2.0x`):**
+  - Formula `(base + shift diff + longevity + specialty) / 2080`; `<24hr` cancel = **`2 hr`** pay; post-report cancel = COD reassigns or pay balance; holiday SE `≥4 hrs` adds holiday back (unless exchanged for PBA).
+  - **PBA (`Art. 27`):** Notice Mar 1 (or 15d post-reschedule), bid `45d`, post `15d`; `<50%` bike-certified; EST/PSRT first for VIP visits; inverse exempts undercover, full-shift workers, 1-time Preferential Bid vac, and same-day inversed holiday officers.
+  - **FOPLC (`Art. 22`):** Ratios **`1 Sgt : ≤6 officers`** & **`1 Lt : 4 Sgts`**; supervisory duties only; Vice/Narcotics & Crime Scene exempt from SE inverse; cross-union exchange w/ inversed PBA allowed.
+
+#### 2.2.4 Call-Out, On-Call Banks, IA & Court Pay
+- **Call-Out (`≤48hr` notice, `PBA Art. 40 §§1–2`, `FOPLC Art. 23 §§1–3`):** `+2 hr` bonus if begins AND ends outside regular shift; `+1 hr` if either begins OR ends outside shift (`PBA`: `≥1 hr` separation between call-outs, else `1 hr` min). Holiday call-out `2.0x` + holiday back (`PBA ≥4 hrs`; `FOPLC >4 hrs`, `0500–0600` window then `1.5x` past `0600` outside shift).
+- **On-Call Teams (`PBA Art. 40 §§3–4`, `FOPLC Art. 23 §4`):** Weekly bonuses: Homicide/ASU (`PBA 8/8.5 hr` split `4/4` or `4.25/4.25`; `FOPLC` Homicide/CS/Fatal Crash Supervisors `1 day/primary wk`, ASU `0.5/primary + 0.5/backup`, Fatal Crash member `0.5/primary`), CS (`PBA 4+4 hr` over 2 wks), Fatal Crash (`PBA 4/4.25 hr`). Annual banks (`8/8.5 hr` day): `EST 4d`, `CRT 4d`, `EOD 2d`, `PIO 2d`, `PSRT 1d/callout >4h` (`FOPLC` adds `ASU 4d`, `EOD K9 2d`, `Shooting/UOF 2d`). Requires `≥60%` annual call-out attendance; forfeited if unused before next year Non-FLSA paydown.
+- **Off-Duty IA / OPS & Court:** IA interviews (`PBA Art. 7 §6`, `FOPLC Art. 11 §5D`) add **`+1 hr` travel time** (`FOPLC` `1.5x`). Court (`PBA Art. 41`, `FOPLC Art. 21 §1A`): **`2.0x`**, **`1-hr min`** per appearance (not subpoena) rounded to ¼ hr; `PBA` outside Allen County adds **`1.5x`** travel time.
+
+#### 2.2.5 Vacation Schedules, Personal, FLSA / Non-FLSA & Holidays
+- **Annual Vacation Entitlements (1 day = full shift):**
+  - **PBA (`Art. 43 §§1–2`, `Art. 21 §6`):** `0–6 mo`: `0` (laterals `7` at hire + `5` at 6 mo); `6mo–1yr`: `7`; `1–3 yr`: `12`; `4–5 yr`: `18`; `6..15 yr`: `19..28` (+1/yr); `16..20+ yr`: `29, 30, 31, 32, 34`.
+  - **FOPLC (`Art. 12 §§1–2`):** `3–5 yr`: `18`; `6..15 yr`: `19..28` (+1/yr); `16 yr`: `29`; `17 yr`: `31`; `18 yr`: `32`; `19 yr`: `33`; `20+ yr`: `34`.
+- **Vacation Bid Windows:** Jan Preferential Bids (`PBA`: `2` bids `4–15d` `5/2` or `2–16d` `4/2`, primary then secondary by seniority, **14-day fallback bid if both denied**; `FOPLC`: Jan `2` bids `4–16d` + **June `1` bid `4–16d`**). Rolling seniority `45–15 days`; `PBA <15 days` FCFS (2+ day blocks granted whole); `1-hr` spot increments above min; `PBA` sell back `≤5 days` by Apr 15.
+- **Personal & Bereavement:** `10` (`PBA`) / `12` (`FOPLC`) personal days/yr in `1-hr` increments above min. Bereavement `8 / 5 / 3` days excl. RDOs + extended days exempt from min.
+- **FLSA / Non-FLSA:** PBA 7-day Sun A-shift work periods: `1.5x` after `42.5 hrs` (`4/2`) or `40 hrs` (`4/3` & `5/2`); base includes worked, FLSA/Non-FLSA used, PBA leave (excl. seminars), holidays (excludes vac/sick/bereavement/personal). **400-hr Non-FLSA paydown:** PBA paid by **Feb 28** (`Art. 48`); FOP submitted **Jan 15** / paid **Jan 31** (`Art. 28 §2`). Transfer/donation cap **`160 hrs/yr`**.
+- **Holidays (12):** New Year's Day, MLK, Easter, Memorial Day, Juneteenth, Independence Day, Labor Day, Veterans Day, Thanksgiving, Christmas Eve, Christmas Day, New Year's Eve. `2.0x` + holiday back (`FOPLC 2.5x` per `0.5 hr` outside regular shift). **PBA (`Art. 36`)**: MLK & Memorial on national observance; window `0600–0630` next day; `45–15d` shift seniority, `15–10d` patrol HB, `10–5d` inverse + exchange, lock `5d` prior. **FOPLC (`Art. 13`, `Art. 24 §2C`)**: ALL observed on actual date; `0500–0600` call-out window; `45–15d` cascade (`on-shift Uniform → any-shift Uniform → inverse Sgt → senior Sgt COD`), post `≥15d`; post-award absence exhausts denied on-shift Sgts/Lts first.
 
 ---
 
 ## 3. Codebase & Workflow Engineering Guardrails
 
-### 3.1 Git & Branch Hygiene
-- **Never develop directly on `main`:** All code edits, fixes, and feature commits MUST be made on **`macc-dev`**. `main` serves the live GitHub Pages deployment and receives changes only via reviewed merges from `macc-dev`.
-- **Keep contract source files immutable:** Never alter `PBA_Contract_2026.md`, `PBA_Contract_2026.docx`, `FOPLC_Contract_2026.md`, or `2026 FOPLC Final Contract.pdf` unless updating to a newly ratified CBA.
+### 3.1 Git, Branch & Token-Efficiency Hygiene
+- **Never develop directly on `main`:** All code edits, fixes, and feature commits MUST be made on **`macc-dev`** (or a dedicated feature branch). `main` serves the live GitHub Pages deployment and receives changes only via clean merges from verified branches.
+- **Token-Lean Documentation Policy:** Keep `docs/ARCHITECTURE.md` and `docs/RULES.md` concise and authoritative so agents can onboard with minimal tokens. Raw CBA files (`PBA_Contract_2026.*`, `FOPLC_Contract_2026.*`) and `CONTRACT_RULES.md` are consolidated here and remain archived in git history (`e91d318` / `10bdf32`) — do not re-duplicate them into the active working tree unless revising for a newly ratified CBA.
 
 ### 3.2 Single-File Architecture & Verification Invariants
 - **No Unplanned File Splitting:** Unless an explicit modularization/build-pipeline plan is approved, keep `index.html` as a self-contained single file so GitHub Pages and preview iframes work with zero build tooling.

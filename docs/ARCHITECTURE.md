@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — FWPD "The Books"
 
 **Repository:** `/home/antigravity/macc0311/fwpd-the-books`  
-**Active Branch:** `macc-dev` (synced with `origin/macc-dev` and `main` at `e91d318`)  
+**Active Branch:** `macc-dev` (synced with `main`)  
 **Primary Runtime Artifact:** `index.html` (12,893 lines / 355,391 bytes — self-contained HTML + CSS + JavaScript monolith)  
 **Target Environment:** Static browser SPA / GitHub Pages (`macc0311/fwpd-the-books`), zero build step, zero backend database
 
@@ -14,15 +14,16 @@
 | File | Size (Bytes) | Lines | Role |
 | :--- | ---: | ---: | :--- |
 | `index.html` | 355,391 | 12,893 | Complete single-file application: CSS design system, DOM layout (Top Navbar, Toast, 4-Division Worksheet, Mobile App Companion, Bottom Analytics/Audit Grid, Popover, Publish Modal), embedded multi-shift/bureau schedule templates, 290-officer directory, scheduling/float/leave/hire-back engines, and standalone HTML release exporter. |
-| `PBA_Contract_2026.md` | 122,973 | 840 | Markdown transcription of the 2026 Fort Wayne Patrolmen's Benevolent Association (PBA) CBA (commissioned officers below rank of Sergeant). |
-| `PBA_Contract_2026.docx` | 67,188 | — | Original Word document source for `PBA_Contract_2026.md`. |
-| `FOPLC_Contract_2026.md` | 80,659 | 466 | Markdown transcription of the 2026 Fort Wayne Fraternal Order of Police Labor Council (FOPLC) CBA (Sergeants and Lieutenants). |
-| `2026 FOPLC Final Contract.pdf` | 342,022 | — | Original PDF source for `FOPLC_Contract_2026.md`. |
+| `docs/ARCHITECTURE.md` | — | — | Codebase topology, DOM/CSS map, state & schema specification, subsystem function inventory, and known technical debt. |
+| `docs/RULES.md` | — | — | Enforced runtime business rules, consolidated 2026 PBA & FOPLC CBA scheduling rules, gap analysis, and engineering guardrails. |
+
+> **Archived CBA Sources (Token Optimization):** Raw contract source files (`PBA_Contract_2026.md`, `PBA_Contract_2026.docx`, `FOPLC_Contract_2026.md`, `2026 FOPLC Final Contract.pdf` — preserved at commit `e91d318`) and `CONTRACT_RULES.md` (`10bdf32`) were consolidated into `docs/RULES.md` and removed from the active tree to keep repository scans fast and token-efficient.
 
 ### 1.2 Git Branch & Recent History
 
-- **`macc-dev`** (`* macc-dev`, tracking `origin/macc-dev`): Active development branch. All feature engineering happens here.
-- **`main`** (`origin/main`, `origin/HEAD -> origin/main`): Production/GitHub Pages branch. Currently at parity with `macc-dev` via merge commit `e91d318` (`Merge branch 'main' into macc-dev`).
+- **`macc-dev`** (`* macc-dev`, tracking `origin/macc-dev`): Active personal development branch synced cleanly with `main`.
+- **`main`** (`origin/main`, `origin/HEAD -> origin/main`): Production/GitHub Pages branch carrying the verified `index.html` and consolidated `docs/` reference files.
+- **`bmac-dev`** (`origin/bmac-dev`): Collaborator development branch (`css/` and `js/` modular extensions for zero-touch hire-back countdown, persistence, and roll-call print).
 - **Key Recent Commits:**
   - `6123c40` — Pause floating when shift drops below minimum so awarded Hire-Back fills vacated role directly.
   - `b230954` — Automate Hire-Back opt-in notifications, bidding engine (`>=24hr` seniority vs `<24hr` FCFS), and winner schedule placement.
