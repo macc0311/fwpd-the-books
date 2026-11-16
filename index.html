@@ -483,48 +483,41 @@
                 <!-- OFFICER ROWS -->
                 <tbody id="paperOfficersBody"></tbody>
 
-                <!-- DAY OFF / LEAVE ROSTER SECTION -->
-                <thead>
-                  <tr>
-                    <th colspan="12" class="bg-slate-800 text-white font-bold text-left px-3 py-1.5 text-[11px] tracking-wider uppercase">
-                      <div class="flex items-center justify-between">
-                        <span>DAY OFF / TIME OFF / MARKED-OFF ROSTER (Automatically Updated Upon Approval)</span>
-                        <span class="text-[10px] font-normal text-slate-300">Click ▾ next to your name in Day Off to Return to Duty</span>
-                      </div>
-                    </th>
-                  </tr>
-                  <tr>
-                    <th class="col-sub-cell">CAR</th>
-                    <th class="col-sub-cell">NW DAY OFF</th>
-                    <th class="col-sub-cell div-sep-right">STATUS</th>
-                    <th class="col-sub-cell">CAR</th>
-                    <th class="col-sub-cell">NE DAY OFF</th>
-                    <th class="col-sub-cell div-sep-right">STATUS</th>
-                    <th class="col-sub-cell">CAR</th>
-                    <th class="col-sub-cell">SW DAY OFF</th>
-                    <th class="col-sub-cell div-sep-right">STATUS</th>
-                    <th class="col-sub-cell">CAR</th>
-                    <th class="col-sub-cell">SE DAY OFF</th>
-                    <th class="col-sub-cell">STATUS</th>
-                  </tr>
-                </thead>
-                <tbody id="paperDayOffBody"></tbody>
-
-                <!-- SCHEDULED SHIFT OFF-TIME & SPECIAL ASSIGNMENT SHEET (From Official Shift Book) -->
+                <!-- SCHEDULED SHIFT OFF-TIME & SPECIAL ASSIGNMENT SHEET (Unified Official Shift Book + Live Marked-Off Officers) -->
                 <thead>
                   <tr>
                     <th colspan="12" class="bg-slate-900 text-white font-bold text-left px-3 py-1.5 text-[11px] tracking-wider uppercase border-t-2 border-slate-700">
-                      <div class="flex items-center justify-between">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
                         <span id="scheduledOffTimeTitle">SCHEDULED SHIFT OFF-TIME &amp; SPECIAL ASSIGNMENTS (REGULAR DAY OFF / VACATION / SICK / TRAINING)</span>
-                        <span class="text-[10px] font-normal text-slate-400">Official Shift Off-Time Roster</span>
+                        <span class="text-[10px] font-normal text-slate-300">Click <strong>▾</strong> next to any marked-off officer below to Return to Duty or change leave category</span>
                       </div>
                     </th>
                   </tr>
                   <tr>
-                    <th colspan="3" class="col-sub-cell div-sep-right !bg-amber-400/20 !text-amber-900 dark:!text-amber-300">DAY OFF (ROTATION)</th>
-                    <th colspan="3" class="col-sub-cell div-sep-right !bg-amber-400/20 !text-amber-900 dark:!text-amber-300">PREF. VACATION / VACATION / NFLSA</th>
-                    <th colspan="3" class="col-sub-cell div-sep-right !bg-amber-400/20 !text-amber-900 dark:!text-amber-300">SICK / LIGHT DUTY / MILITARY</th>
-                    <th colspan="3" class="col-sub-cell !bg-amber-400/20 !text-amber-900 dark:!text-amber-300">TRAINING / ADMIN / EXCH / SPECIAL</th>
+                    <th colspan="3" class="col-sub-cell div-sep-right !bg-amber-400/20 !text-amber-900 dark:!text-amber-300">
+                      <div class="flex items-center justify-between px-1">
+                        <span>DAY OFF (ROTATION)</span>
+                        <span id="offColCount-dayOff" class="px-1.5 py-0.2 rounded bg-amber-500/20 text-[10px] font-mono">0</span>
+                      </div>
+                    </th>
+                    <th colspan="3" class="col-sub-cell div-sep-right !bg-amber-400/20 !text-amber-900 dark:!text-amber-300">
+                      <div class="flex items-center justify-between px-1">
+                        <span>PREF. VACATION / VACATION / PERSONAL / NFLSA</span>
+                        <span id="offColCount-vacation" class="px-1.5 py-0.2 rounded bg-amber-500/20 text-[10px] font-mono">0</span>
+                      </div>
+                    </th>
+                    <th colspan="3" class="col-sub-cell div-sep-right !bg-amber-400/20 !text-amber-900 dark:!text-amber-300">
+                      <div class="flex items-center justify-between px-1">
+                        <span>SICK / BEREAVEMENT / LIGHT DUTY / MILITARY</span>
+                        <span id="offColCount-sickAndLeave" class="px-1.5 py-0.2 rounded bg-amber-500/20 text-[10px] font-mono">0</span>
+                      </div>
+                    </th>
+                    <th colspan="3" class="col-sub-cell !bg-amber-400/20 !text-amber-900 dark:!text-amber-300">
+                      <div class="flex items-center justify-between px-1">
+                        <span>TRAINING / ADMIN / EXCH / UNION / SPECIAL</span>
+                        <span id="offColCount-trainingAndSpecial" class="px-1.5 py-0.2 rounded bg-amber-500/20 text-[10px] font-mono">0</span>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody id="paperScheduledOffTimeBody"></tbody>
@@ -10724,7 +10717,7 @@
           </div>
         `;
       } else {
-        // Day Off Roster Popover
+        // Day Off Roster Popover (Triggered from bottom Scheduled Off-Time columns)
         const item = app.dayOffRoster[div].find(o => o.homeUnit === unit);
         if (!item) return;
 
@@ -10738,18 +10731,24 @@
               <span>🟢 Return to Work (${unit})</span>
               <span class="text-[10px] font-mono">Restore</span>
             </button>
-            <div class="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Change Leave Type</div>
-            <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'SICK')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
-              🤒 Sick Leave
-            </button>
+            <div class="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Change Leave Category</div>
             <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'DAY_OFF_VAC')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
               🏖️ Day Off (Vacation)
             </button>
             <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'DAY_OFF_PERS')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
               📅 Personal Day
             </button>
+            <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'DAY_OFF_FLSA')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
+              ⏱️ FLSA / Comp Time
+            </button>
+            <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'SICK')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
+              🤒 Sick Leave
+            </button>
             <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'BEREAVEMENT')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
               🕊️ Bereavement Leave
+            </button>
+            <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'UTB')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
+              🛡️ Union Time Bank
             </button>
           </div>
         `;
@@ -10760,7 +10759,7 @@
       // Position near clicked caret button without overflowing viewport
       const rect = event.currentTarget.getBoundingClientRect();
       const menuWidth = 256;
-      const menuHeight = 290;
+      const menuHeight = 310;
       let left = rect.right - menuWidth;
       let top = rect.bottom + 6;
       if (left < 12) left = 12;
@@ -10784,6 +10783,57 @@
     // =========================================================================
     // OFFICER LEAVE / STATUS LOGIC
     // =========================================================================
+    const LEAVE_CONFIG_MAP = {
+      DAY_OFF_VAC: {
+        label: 'Day Off — Vacation (Art. 43)',
+        shortCode: 'VAC / DAY OFF',
+        categoryCol: 'vacation',
+        categoryLabel: 'Vacation / Personal / NFLSA',
+        requiresAboveMin: true,
+        article: 'Art. 43 §4'
+      },
+      DAY_OFF_PERS: {
+        label: 'Day Off — Personal Day (Art. 44)',
+        shortCode: 'PERSONAL',
+        categoryCol: 'vacation',
+        categoryLabel: 'Vacation / Personal / NFLSA',
+        requiresAboveMin: true,
+        article: 'Art. 44 §1'
+      },
+      DAY_OFF_FLSA: {
+        label: 'Day Off — FLSA / Comp (Art. 39)',
+        shortCode: 'FLSA COMP',
+        categoryCol: 'vacation',
+        categoryLabel: 'Vacation / Personal / NFLSA',
+        requiresAboveMin: true,
+        article: 'Art. 39 §2'
+      },
+      SICK: {
+        label: 'Sick Leave Call-In (Art. 50)',
+        shortCode: 'SICK LEAVE',
+        categoryCol: 'sickAndLeave',
+        categoryLabel: 'Sick / Bereavement / Leave',
+        requiresAboveMin: false,
+        article: 'Art. 50 & Art. 35 §3'
+      },
+      BEREAVEMENT: {
+        label: 'Bereavement Leave (Art. 45)',
+        shortCode: 'BEREAVEMENT',
+        categoryCol: 'sickAndLeave',
+        categoryLabel: 'Sick / Bereavement / Leave',
+        requiresAboveMin: false,
+        article: 'Art. 45'
+      },
+      UTB: {
+        label: 'Union Time Bank (Art. 16)',
+        shortCode: 'UNION TIME',
+        categoryCol: 'trainingAndSpecial',
+        categoryLabel: 'Training / Admin / Union / Special',
+        requiresAboveMin: false,
+        article: 'Art. 16 §1'
+      }
+    };
+
     function handleOfficerStatusSelect(div, unit, actionValue) {
       if (!actionValue || actionValue === 'ON_DUTY') return;
 
@@ -10823,45 +10873,7 @@
         return;
       }
 
-      const leaveConfig = {
-        DAY_OFF_VAC: {
-          label: 'Day Off — Vacation (Art. 43)',
-          shortCode: 'VAC / DAY OFF',
-          requiresAboveMin: true,
-          article: 'Art. 43 §4'
-        },
-        DAY_OFF_PERS: {
-          label: 'Day Off — Personal Day (Art. 44)',
-          shortCode: 'PERSONAL',
-          requiresAboveMin: true,
-          article: 'Art. 44 §1'
-        },
-        DAY_OFF_FLSA: {
-          label: 'Day Off — FLSA / Comp (Art. 39)',
-          shortCode: 'FLSA COMP',
-          requiresAboveMin: true,
-          article: 'Art. 39 §2'
-        },
-        SICK: {
-          label: 'Sick Leave Call-In (Art. 50)',
-          shortCode: 'SICK LEAVE',
-          requiresAboveMin: false,
-          article: 'Art. 50 & Art. 35 §3'
-        },
-        BEREAVEMENT: {
-          label: 'Bereavement Leave (Art. 45)',
-          shortCode: 'BEREAVEMENT',
-          requiresAboveMin: false,
-          article: 'Art. 45'
-        },
-        UTB: {
-          label: 'Union Time Bank (Art. 16)',
-          shortCode: 'UNION TIME',
-          requiresAboveMin: false,
-          article: 'Art. 16 §1'
-        }
-      }[actionValue];
-
+      const leaveConfig = LEAVE_CONFIG_MAP[actionValue];
       if (!leaveConfig) return;
 
       if (leaveConfig.requiresAboveMin && currentCount <= minCount) {
@@ -10900,9 +10912,11 @@
 
       app.dayOffRoster[homeSlotDiv].push({
         homeUnit: homeSlotUnit,
+        div: homeSlotDiv,
         name: offName,
         pe: offPe,
         status: leaveConfig.shortCode,
+        categoryCol: leaveConfig.categoryCol || 'vacation',
         fullLabel: leaveConfig.label,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       });
@@ -10922,15 +10936,15 @@
 
       app.toastData = {
         status: 'approved',
-        title: `${offName} (#${offPe}) Moved to Day Off • Schedule Shifted Automatically`,
+        title: `${offName} (#${offPe}) Marked Off (${leaveConfig.shortCode}) • Added to ${leaveConfig.categoryLabel}`,
         step1: countExplanation,
-        step2: `Step 2 (Day Off Roster): ${offName} (#${offPe}) moved to ${homeSlotDiv} Division Day Off Roster.`,
+        step2: `Step 2 (Off-Time Sheet): ${offName} (#${offPe}) [${homeSlotUnit}] placed in the bottom "${leaveConfig.categoryLabel}" column.`,
         step3: floatExplanation
       };
 
       app.auditEntries.unshift({
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        msg: `${offName} (#${offPe}) [${homeSlotUnit}] marked ${leaveConfig.shortCode}. ${relevantFloat ? `${relevantFloat.name} (#${relevantFloat.pe}) floated ${relevantFloat.fromUnit} → ${relevantFloat.toUnit}.` : ''}`,
+        msg: `${offName} (#${offPe}) [${homeSlotUnit}] marked ${leaveConfig.shortCode} (${leaveConfig.categoryLabel}). ${relevantFloat ? `${relevantFloat.name} (#${relevantFloat.pe}) floated ${relevantFloat.fromUnit} → ${relevantFloat.toUnit}.` : ''}`,
         tag: leaveConfig.article
       });
 
@@ -10946,8 +10960,8 @@
       app.toastData = {
         status: 'approved',
         title: `Returned to Duty: ${entry.name} (#${entry.pe}) Restored to ${homeUnit} (${div})`,
-        step1: `Step 1: ${entry.name} (#${entry.pe}) removed from ${div} Day Off Roster and restored to ${homeUnit}.`,
-        step2: `Step 2: Floated coverage officer (Sikorski #2078) automatically returned to home car F212.`,
+        step1: `Step 1: ${entry.name} (#${entry.pe}) removed from the Scheduled Off-Time column and restored to ${homeUnit}.`,
+        step2: `Step 2: Floated coverage reassignments automatically reversed back to home cars.`,
         step3: ''
       };
 
@@ -10969,16 +10983,11 @@
       const item = app.dayOffRoster[div].find(o => o.homeUnit === homeUnit);
       if (!item) return;
 
-      const labels = {
-        DAY_OFF_VAC: 'VAC / DAY OFF',
-        DAY_OFF_PERS: 'PERSONAL',
-        DAY_OFF_FLSA: 'FLSA COMP',
-        SICK: 'SICK LEAVE',
-        BEREAVEMENT: 'BEREAVEMENT',
-        UTB: 'UNION TIME'
-      };
-      if (labels[actionVal]) {
-        item.status = labels[actionVal];
+      const cfg = LEAVE_CONFIG_MAP[actionVal];
+      if (cfg) {
+        item.status = cfg.shortCode;
+        item.categoryCol = cfg.categoryCol;
+        item.fullLabel = cfg.label;
         renderAll();
       }
     }
@@ -11167,7 +11176,6 @@
       renderToast();
       renderPaperCommandRows();
       renderPaperOfficerRows();
-      renderPaperDayOffRows();
       renderPaperScheduledOffTimeRows();
       renderMobileAppCompanion(count, min);
       renderBottomPanels(count, min);
@@ -11336,58 +11344,71 @@
     }
 
     // =========================================================================
-    // RENDER DAY OFF / LEAVE ROSTER AT BOTTOM OF WORKSHEET
+    // RENDER UNIFIED SCHEDULED OFF-TIME & MARKED-OFF COLUMNS AT BOTTOM
     // =========================================================================
-    function renderPaperDayOffRows() {
-      const tbody = document.getElementById('paperDayOffBody');
-      const maxLen = Math.max(
-        2,
-        app.dayOffRoster.NW.length,
-        app.dayOffRoster.NE.length,
-        app.dayOffRoster.SW.length,
-        app.dayOffRoster.SE.length
-      );
+    function inferOffTimeCategory(item) {
+      if (item.categoryCol) return item.categoryCol;
+      const st = (item.status || '').toUpperCase();
+      if (st.includes('SICK') || st.includes('BEREAV')) return 'sickAndLeave';
+      if (st.includes('UNION') || st.includes('TRN') || st.includes('EXCH')) return 'trainingAndSpecial';
+      if (st === 'DAY OFF') return 'dayOff';
+      return 'vacation';
+    }
 
-      let html = '';
-      for (let i = 0; i < maxLen; i++) {
-        html += '<tr>';
-        DIV_KEYS.forEach((div, dIdx) => {
-          const sepCls = dIdx < 3 ? 'div-sep-right' : '';
-          const item = app.dayOffRoster[div][i];
-          if (item) {
-            const hasPerm = app.loggedInPe === 'COD' || item.pe === app.loggedInPe;
-            const isMe = app.loggedInPe !== 'COD' && item.pe === app.loggedInPe;
-            const bgCls = isMe ? 'row-logged-in' : 'bg-[var(--dayoff-bg)]';
-
-            const caretBtn = hasPerm
-              ? `<button type="button" onclick="openOfficerActionPopover(event, 'DAY_OFF', '${div}', '${item.homeUnit}')" class="caret-btn" title="Manage Day Off or Return to Work">▾</button>`
-              : '';
-
-            html += `
-              <td class="unit-cell font-bold text-red-600 dark:text-red-400">${item.homeUnit}</td>
-              <td class="${bgCls}">
-                <div class="flex items-center justify-between gap-1">
-                  <div class="truncate font-bold text-[var(--dayoff-text)]">
-                    ${item.name} <span class="font-mono text-[10.5px]">(${item.pe})</span>
-                  </div>
-                  ${caretBtn}
-                </div>
-              </td>
-              <td class="text-center ${bgCls} ${sepCls}">
-                <span class="px-1.5 py-0.2 rounded bg-red-500/15 text-red-600 dark:text-red-300 font-mono font-bold text-[10px]">${item.status}</span>
-              </td>
-            `;
-          } else {
-            html += `
-              <td class="unit-cell opacity-40">—</td>
-              <td class="text-[var(--text-faint)] text-[11px] italic">${i === 0 ? 'None marked off' : ''}</td>
-              <td class="${sepCls}"></td>
-            `;
-          }
-        });
-        html += '</tr>';
+    function formatStaticOffTimeEntry(rawStr, colKey) {
+      if (!rawStr) return '';
+      const m = rawStr.match(/^(.+?)\s*\((\d+)\)\s*(.*?)(?:\[(.+?)\])?\s*$/);
+      const pillStyles = {
+        dayOff: 'bg-slate-500/15 text-[var(--text-muted)]',
+        vacation: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
+        sickAndLeave: 'bg-red-500/15 text-red-700 dark:text-red-300',
+        trainingAndSpecial: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+      };
+      const pillCls = pillStyles[colKey] || pillStyles.dayOff;
+      if (!m) {
+        return `<div class="flex items-center justify-between gap-1"><span class="font-medium text-[var(--text-main)] truncate">${rawStr}</span></div>`;
       }
-      tbody.innerHTML = html;
+      const name = m[1].trim();
+      const pe = m[2].trim();
+      const hrs = (m[3] || '').trim();
+      const tag = (m[4] || '').trim();
+      const hrsSpan = hrs ? `<span class="font-mono text-[10px] text-[var(--text-muted)]">${hrs}</span>` : '';
+      const tagSpan = tag
+        ? `<span class="px-1.5 py-0.2 rounded font-mono font-bold text-[9.5px] ${pillCls}">${tag}</span>`
+        : '';
+      return `
+        <div class="flex items-center justify-between gap-1.5">
+          <div class="truncate">
+            <span class="font-medium text-[var(--text-main)]">${name}</span>
+            <span class="font-mono text-[10.5px] text-[var(--text-muted)]">(${pe})</span>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            ${hrsSpan}
+            ${tagSpan}
+          </div>
+        </div>
+      `;
+    }
+
+    function formatDynamicMarkedOffEntry(item) {
+      const div = item.div;
+      const hasPerm = app.loggedInPe === 'COD' || item.pe === app.loggedInPe;
+      const caretBtn = hasPerm
+        ? `<button type="button" onclick="openOfficerActionPopover(event, 'DAY_OFF', '${div}', '${item.homeUnit}')" class="caret-btn" title="Return to Work (${item.homeUnit}) or Change Leave Category">▾</button>`
+        : '';
+      return `
+        <div class="flex items-center justify-between gap-1">
+          <div class="flex items-center gap-1.5 truncate">
+            <span class="px-1 py-0.2 rounded bg-red-500/15 text-red-600 dark:text-red-300 border border-red-500/30 font-mono font-bold text-[9.5px] shrink-0" title="Home Unit ${item.homeUnit} (${div} Division)">${item.homeUnit}</span>
+            <span class="font-bold text-[var(--dayoff-text)] truncate">${item.name}</span>
+            <span class="font-mono text-[10.5px] text-[var(--text-muted)] shrink-0">(${item.pe})</span>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <span class="px-1.5 py-0.2 rounded bg-red-500/20 text-red-700 dark:text-red-300 font-mono font-bold text-[9.5px]">${item.status}</span>
+            ${caretBtn}
+          </div>
+        </div>
+      `;
     }
 
     function renderPaperScheduledOffTimeRows() {
@@ -11395,27 +11416,58 @@
       if (!tbody) return;
       const sched = ALL_SCHEDULES[app.activeScheduleId];
       const sheet = sched.offTimeSheet || { dayOff: [], vacation: [], sickAndLeave: [], trainingAndSpecial: [] };
+
+      const colKeys = ['dayOff', 'vacation', 'sickAndLeave', 'trainingAndSpecial'];
+      const cols = {
+        dayOff: [],
+        vacation: [],
+        sickAndLeave: [],
+        trainingAndSpecial: []
+      };
+
+      // 1. Place dynamically marked-off officers at the top of their appropriate category column
+      for (const div of DIV_KEYS) {
+        for (const item of app.dayOffRoster[div]) {
+          const entryWithDiv = { ...item, div: item.div || div };
+          const targetCol = inferOffTimeCategory(entryWithDiv);
+          cols[targetCol].push({ type: 'dynamic', item: entryWithDiv });
+        }
+      }
+
+      // 2. Append scheduled shift off-time entries underneath in each category column
+      for (const k of colKeys) {
+        for (const rawStr of (sheet[k] || [])) {
+          cols[k].push({ type: 'static', raw: rawStr, colKey: k });
+        }
+        const badgeEl = document.getElementById(`offColCount-${k}`);
+        if (badgeEl) badgeEl.textContent = cols[k].length;
+      }
+
       const maxRows = Math.max(
         1,
-        sheet.dayOff.length,
-        sheet.vacation.length,
-        sheet.sickAndLeave.length,
-        sheet.trainingAndSpecial.length
+        cols.dayOff.length,
+        cols.vacation.length,
+        cols.sickAndLeave.length,
+        cols.trainingAndSpecial.length
       );
+
       let html = '';
       for (let i = 0; i < maxRows; i++) {
-        const c1 = sheet.dayOff[i] || '';
-        const c2 = sheet.vacation[i] || '';
-        const c3 = sheet.sickAndLeave[i] || '';
-        const c4 = sheet.trainingAndSpecial[i] || '';
-        html += `
-          <tr>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-[var(--text-main)]">${c1}</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-blue-700 dark:text-blue-300">${c2}</td>
-            <td colspan="3" class="div-sep-right font-mono text-[11px] text-red-700 dark:text-red-300">${c3}</td>
-            <td colspan="3" class="font-mono text-[11px] text-emerald-700 dark:text-emerald-300">${c4}</td>
-          </tr>
-        `;
+        html += '<tr>';
+        colKeys.forEach((k, cIdx) => {
+          const sepCls = cIdx < 3 ? 'div-sep-right' : '';
+          const entry = cols[k][i];
+          if (!entry) {
+            html += `<td colspan="3" class="${sepCls}"></td>`;
+          } else if (entry.type === 'dynamic') {
+            const isMe = app.loggedInPe !== 'COD' && entry.item.pe === app.loggedInPe;
+            const bgCls = isMe ? 'row-logged-in' : 'bg-[var(--dayoff-bg)]';
+            html += `<td colspan="3" class="${bgCls} ${sepCls}">${formatDynamicMarkedOffEntry(entry.item)}</td>`;
+          } else {
+            html += `<td colspan="3" class="${sepCls} text-[11px]">${formatStaticOffTimeEntry(entry.raw, entry.colKey)}</td>`;
+          }
+        });
+        html += '</tr>';
       }
       tbody.innerHTML = html;
     }
