@@ -348,7 +348,7 @@
 
             <!-- Left: Status Pill (MINIMUM COUNT / ABOVE / BELOW) + Quick Demo Min Control -->
             <div class="flex flex-wrap items-center gap-2.5">
-              <div id="sheetMinBanner" class="px-3.5 py-1.5 rounded-lg font-extrabold text-xs tracking-wider uppercase flex items-center gap-2 shadow-xs">
+              <div id="sheetMinBanner" onclick="openHireBackPopover(event)" title="Click to assign a Cross-Shift Hire-Back Officer (Art. 35)" class="px-3.5 py-1.5 rounded-lg font-extrabold text-xs tracking-wider uppercase flex items-center gap-2 shadow-xs cursor-pointer">
                 <span id="sheetMinDot" class="w-2 h-2 rounded-full"></span>
                 <span id="sheetMinText">MINIMUM COUNT</span>
               </div>
@@ -360,6 +360,9 @@
                 <button onclick="changeMinimum(1)" class="w-5 h-5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 font-bold text-xs cursor-pointer">+</button>
                 <button onclick="setMinForVacationDemo()" class="ml-1 px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-[10px] font-semibold transition cursor-pointer" title="Sets Shift Minimum to 31 so Shift Count 32 has 1 open Vacation/Day-Off slot">
                   Open 1 Leave Slot (Min 31)
+                </button>
+                <button onclick="openHireBackPopover(event)" class="ml-0.5 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 rounded-md text-[10px] font-bold transition cursor-pointer" title="Assign an officer from another shift (B/C-Shift) or off-time to work a Hire-Back on this shift">
+                  ⚡ Cross-Shift Hire-Back ▾
                 </button>
               </div>
             </div>
@@ -10239,11 +10242,12 @@
     let INITIAL_OFFICERS = ALL_SCHEDULES.A_11_15.officers;
 
     const HIREBACK_POOL = [
-      { name: 'PATINO, R', pe: 1742 },
-      { name: 'STEWART, L', pe: 1812 },
-      { name: 'SANDERS, G', pe: 1860 },
-      { name: 'McGILL, M', pe: 1977 },
-      { name: 'LAMBIASE, B', pe: 2013 }
+      { name: 'AGUILERA, A', pe: 1997, shift: 'B', unit: 'D41' },
+      { name: 'SCHULIEN, S', pe: 1746, shift: 'B', unit: 'L354' },
+      { name: 'FAIRCHILD, C', pe: 1689, shift: 'C', unit: 'A196' },
+      { name: 'SANDERS, G', pe: 1860, shift: 'C', unit: 'K399' },
+      { name: 'LAMBIASE, B', pe: 2013, shift: 'C', unit: 'C171' },
+      { name: 'PATINO, R', pe: 1742, shift: 'B', unit: 'F244' }
     ];
 
     let app = {
@@ -10257,6 +10261,7 @@
       darkMode: false,
       command: {},
       officers: {},
+      offTimeSheet: { dayOff: [], vacation: [], sickAndLeave: [], trainingAndSpecial: [] },
       dayOffRoster: { NW: [], NE: [], SW: [], SE: [] },
       floatedMoves: [],
       auditEntries: [],
@@ -10273,6 +10278,29 @@
       const first = unitStr.charAt(0);
       if (/[A-O]/.test(first) && !unitStr.startsWith('K9')) return first;
       return '';
+    }
+
+    function parseStaticOffTimeString(rawStr, colKey = 'dayOff', idx = 0) {
+      if (!rawStr) return null;
+      const m = rawStr.match(/^(.+?)\s*\((\d+)\)\s*(.*?)(?:\[(.+?)\])?\s*$/);
+      const defaultTagMap = {
+        dayOff: 'DAY OFF',
+        vacation: 'VACATION',
+        sickAndLeave: 'LEAVE',
+        trainingAndSpecial: 'SPECIAL'
+      };
+      if (!m) {
+        return { name: rawStr.trim(), pe: null, hrs: '', tag: defaultTagMap[colKey] || 'OFF', rawStr, colKey, idx };
+      }
+      return {
+        name: m[1].trim(),
+        pe: parseInt(m[2], 10),
+        hrs: (m[3] || '').trim(),
+        tag: (m[4] || defaultTagMap[colKey] || 'OFF').trim(),
+        rawStr,
+        colKey,
+        idx
+      };
     }
 
     function formatLongDate(isoDate) {
@@ -10323,6 +10351,7 @@
         shiftMin: app.shiftMin,
         command: clone(app.command),
         officers: clone(app.officers),
+        offTimeSheet: clone(app.offTimeSheet),
         dayOffRoster: clone(app.dayOffRoster),
         floatedMoves: clone(app.floatedMoves),
         auditEntries: clone(app.auditEntries)
@@ -10384,13 +10413,14 @@
       INITIAL_COMMAND = tmpl.command;
       INITIAL_OFFICERS = tmpl.officers;
 
-      const key = `${app.selectedDate}_${app.selectedShift}`;
+      const key = `${app.selectedBureau}_${app.selectedDate}_${app.selectedShift}`;
       const saved = app.savedHistory[key];
 
       if (saved) {
         app.shiftMin = saved.shiftMin;
         app.command = clone(saved.command);
         app.officers = clone(saved.officers);
+        app.offTimeSheet = clone(saved.offTimeSheet || tmpl.offTimeSheet || { dayOff: [], vacation: [], sickAndLeave: [], trainingAndSpecial: [] });
         app.dayOffRoster = clone(saved.dayOffRoster);
         app.floatedMoves = clone(saved.floatedMoves);
         app.auditEntries = clone(saved.auditEntries);
@@ -10406,10 +10436,12 @@
             homePe: row.pe,
             homePartner: row.partner || '',
             isHireBack: false,
+            isReturnedOffTime: false,
             floatedFrom: null,
             floatedTo: null
           }));
         }
+        app.offTimeSheet = clone(tmpl.offTimeSheet || { dayOff: [], vacation: [], sickAndLeave: [], trainingAndSpecial: [] });
         app.dayOffRoster = { NW: [], NE: [], SW: [], SE: [] };
         app.floatedMoves = [];
         const longDate = formatLongDate(app.selectedDate);
@@ -10426,13 +10458,8 @@
       if (targetOfficerPe !== null) {
         app.loggedInPe = targetOfficerPe;
       } else if (app.loggedInPe !== 'COD') {
-        let foundOnShift = false;
-        for (const div of DIV_KEYS) {
-          if (app.officers[div].some(r => r.pe === app.loggedInPe) || app.dayOffRoster[div].some(o => o.pe === app.loggedInPe)) {
-            foundOnShift = true;
-          }
-        }
-        if (!foundOnShift) {
+        const loc = findOfficerByPe(app.loggedInPe);
+        if (!loc) {
           app.loggedInPe = tmpl.defaultOfficerPe;
         }
       }
@@ -10444,26 +10471,56 @@
     }
 
     function initApp() {
-      const key = `${app.selectedDate}_${app.selectedShift}`;
+      const key = `${app.selectedBureau}_${app.selectedDate}_${app.selectedShift}`;
       delete app.savedHistory[key];
       loadActiveDateAndShift();
     }
 
     function populateUserSelect() {
       const sel = document.getElementById('loggedInUserSelect');
+      if (!sel) return;
       const current = String(app.loggedInPe);
       const sched = resolveScheduleTemplate(app.selectedDate, app.selectedShift);
       const opts = [];
+      const seenPe = new Set();
 
-      opts.push(`<optgroup label="Supervisor / COD Mode (All Cars)">`);
+      opts.push(`<optgroup label="Supervisor / COD Mode (All Access)">`);
       opts.push(`<option value="COD" class="text-slate-900">${sched.codLabel} — All Access</option>`);
       opts.push(`</optgroup>`);
 
-      opts.push(`<optgroup label="Current ${app.selectedShift}-Shift Active Roster">`);
+      opts.push(`<optgroup label="Current ${app.selectedShift}-Shift On-Duty Roster">`);
       for (const div of DIV_KEYS) {
-        for (const row of INITIAL_OFFICERS[div]) {
-          if (row.name && row.pe) {
-            opts.push(`<option value="${row.pe}" class="text-slate-900">${row.name} (#${row.pe}) — ${row.unit} [${div}]</option>`);
+        for (const row of app.officers[div] || []) {
+          if (row.name && row.pe && !seenPe.has(row.pe)) {
+            seenPe.add(row.pe);
+            const tag = row.isHireBack ? ' [HIREBACK]' : (row.isReturnedOffTime ? ' [RTW]' : '');
+            opts.push(`<option value="${row.pe}" class="text-slate-900">${row.name} (#${row.pe}) — ${row.unit} [${div}]${tag}</option>`);
+          }
+        }
+      }
+      opts.push(`</optgroup>`);
+
+      opts.push(`<optgroup label="Current ${app.selectedShift}-Shift Off-Time / Vacation / RDO">`);
+      for (const div of DIV_KEYS) {
+        for (const item of app.dayOffRoster[div] || []) {
+          if (item.pe && !seenPe.has(item.pe)) {
+            seenPe.add(item.pe);
+            opts.push(`<option value="${item.pe}" class="text-slate-900">${item.name} (#${item.pe}) — [${item.status}] (Home ${item.homeUnit})</option>`);
+          }
+        }
+      }
+      const colLabels = {
+        vacation: 'VAC/LEAVE',
+        dayOff: 'DAY OFF',
+        sickAndLeave: 'SICK/LEAVE',
+        trainingAndSpecial: 'TRN/SPEC'
+      };
+      for (const colKey of ['vacation', 'dayOff', 'sickAndLeave', 'trainingAndSpecial']) {
+        for (let i = 0; i < (app.offTimeSheet[colKey] || []).length; i++) {
+          const parsed = parseStaticOffTimeString(app.offTimeSheet[colKey][i], colKey, i);
+          if (parsed && parsed.pe && !seenPe.has(parsed.pe)) {
+            seenPe.add(parsed.pe);
+            opts.push(`<option value="${parsed.pe}" class="text-slate-900">${parsed.name} (#${parsed.pe}) — [${parsed.tag || colLabels[colKey]}]</option>`);
           }
         }
       }
@@ -10472,27 +10529,32 @@
       for (const sCode of ['A', 'B', 'C']) {
         if (sCode === app.selectedShift) continue;
         const groupOfficers = MASTER_OPERATIONS_DIRECTORY.filter(o => o.shift === sCode && o.role === 'OFFICER');
-        opts.push(`<optgroup label="Switch to ${sCode}-Shift Officer">`);
+        opts.push(`<optgroup label="Other Shift (${sCode}-Shift — Eligible for Hire-Back)">`);
         for (const off of groupOfficers) {
-          opts.push(`<option value="JUMP_${off.schedId}_${off.pe}" class="text-slate-900">[${sCode}-Shift] ${off.name} (#${off.pe}) — ${off.unit}</option>`);
+          if (!seenPe.has(off.pe)) {
+            seenPe.add(off.pe);
+            opts.push(`<option value="${off.pe}" class="text-slate-900">[${sCode}-Shift] ${off.name} (#${off.pe}) — ${off.unit}</option>`);
+          }
         }
         opts.push(`</optgroup>`);
       }
 
       sel.innerHTML = opts.join('');
-      sel.value = current;
+      if ([...sel.options].some(o => o.value === current)) {
+        sel.value = current;
+      }
     }
 
-    function handleUserSwitch() {
-      const val = document.getElementById('loggedInUserSelect').value;
+    function handleUserSwitch(overridePe = null) {
+      const val = overridePe !== null ? String(overridePe) : document.getElementById('loggedInUserSelect').value;
       if (val === 'COD') {
         app.loggedInPe = 'COD';
         closeActionPopover();
+        populateUserSelect();
         renderAll();
         return;
       }
       if (val.startsWith('JUMP_')) {
-        // Format: JUMP_<schedId>_<pe>
         const parts = val.split('_');
         const pe = parseInt(parts[parts.length - 1], 10);
         const schedId = parts.slice(1, parts.length - 1).join('_');
@@ -10501,6 +10563,7 @@
       }
       app.loggedInPe = parseInt(val, 10);
       closeActionPopover();
+      populateUserSelect();
       renderAll();
     }
 
@@ -10528,14 +10591,27 @@
 
     function findOfficerByPe(peNum) {
       for (const div of DIV_KEYS) {
-        const activeRow = app.officers[div].find(r => r.pe === peNum);
+        const activeRow = (app.officers[div] || []).find(r => r.pe === peNum);
         if (activeRow) {
           return { state: 'ON_DUTY', div, unit: activeRow.unit, row: activeRow };
         }
-        const dayOffItem = app.dayOffRoster[div].find(o => o.pe === peNum);
+        const dayOffItem = (app.dayOffRoster[div] || []).find(o => o.pe === peNum);
         if (dayOffItem) {
           return { state: 'DAY_OFF', div, unit: dayOffItem.homeUnit, item: dayOffItem };
         }
+      }
+      for (const colKey of ['dayOff', 'vacation', 'sickAndLeave', 'trainingAndSpecial']) {
+        const list = app.offTimeSheet[colKey] || [];
+        for (let i = 0; i < list.length; i++) {
+          const parsed = parseStaticOffTimeString(list[i], colKey, i);
+          if (parsed && parsed.pe === peNum) {
+            return { state: 'STATIC_OFF', colKey, idx: i, item: parsed };
+          }
+        }
+      }
+      const otherShiftOff = MASTER_OPERATIONS_DIRECTORY.find(o => o.pe === peNum);
+      if (otherShiftOff) {
+        return { state: 'OTHER_SHIFT', item: otherShiftOff };
       }
       return null;
     }
@@ -10571,7 +10647,7 @@
         for (const r of app.officers[div]) {
           r.floatedFrom = null;
           r.floatedTo = null;
-          if (r.isHireBack) continue;
+          if (r.isHireBack || r.isReturnedOffTime) continue;
           const isMarkedOff = app.dayOffRoster[div].some(o => o.homeUnit === r.unit);
           if (isMarkedOff) {
             r.name = '';
@@ -10652,43 +10728,78 @@
         }
       }
 
+      populateUserSelect();
       renderAll();
     }
 
     // =========================================================================
-    // CUSTOM FLOATING POPOVER MENU (Triggered by subtle ▾ caret)
+    // CUSTOM FLOATING POPOVER MENU (Triggered by subtle ▾ caret on ANY Officer)
     // =========================================================================
-    function openOfficerActionPopover(event, mode, div, unit) {
-      event.stopPropagation();
+    function positionPopoverNearEvent(event, menuHeight = 320, menuWidth = 272) {
       const menu = document.getElementById('floatingActionMenu');
+      menu.classList.remove('hidden');
+      const targetEl = event?.currentTarget || event?.target || document.getElementById('sheetMinBanner');
+      const rect = targetEl.getBoundingClientRect();
+      let left = rect.right - menuWidth;
+      let top = rect.bottom + 6;
+      if (left < 12) left = 12;
+      if (left + menuWidth > window.innerWidth - 12) left = window.innerWidth - menuWidth - 12;
+      if (top + menuHeight > window.innerHeight - 12) {
+        top = Math.max(12, rect.top - menuHeight - 6);
+      }
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
+    }
+
+    function openOfficerActionPopover(event, mode, divOrCol, unitOrIdx) {
+      event.stopPropagation();
       const content = document.getElementById('floatingMenuContent');
       const count = getShiftCount();
       const min = app.shiftMin;
       const canTakeSpotLeave = count > min;
 
       if (mode === 'ON_DUTY') {
+        const div = divOrCol;
+        const unit = unitOrIdx;
         const row = app.officers[div].find(r => r.unit === unit);
         if (!row || !row.name) return;
 
+        const revertSection = (row.isHireBack || row.isReturnedOffTime)
+          ? `
+            <div class="pb-1 mb-1 border-b border-[var(--border-grid)]">
+              <button onclick="closeActionPopover(); cancelTemporaryDutyRow('${div}', '${unit}')" class="w-full text-left px-2.5 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 font-bold flex items-center justify-between cursor-pointer">
+                <span>↩ ${row.isHireBack ? 'Cancel Hire-Back Assignment' : 'Revert to Off-Time Roster'}</span>
+                <span class="text-[10px] font-mono">Undo</span>
+              </button>
+            </div>
+          `
+          : '';
+
         content.innerHTML = `
-          <div class="px-2.5 py-2 border-b border-[var(--border-grid)]">
-            <div class="font-bold text-[var(--text-main)]">${row.name} <span class="font-mono text-[var(--text-muted)]">#${row.pe}</span></div>
-            <div class="text-[10px] text-[var(--text-muted)] font-mono">Unit ${unit} (${div} Division • Dist ${row.district})</div>
+          <div class="px-2.5 py-2 border-b border-[var(--border-grid)] flex items-center justify-between gap-2">
+            <div>
+              <div class="font-bold text-[var(--text-main)]">${row.name} <span class="font-mono text-[var(--text-muted)]">#${row.pe}</span></div>
+              <div class="text-[10px] text-[var(--text-muted)] font-mono">Unit ${unit} (${div} Division • Dist ${row.district})</div>
+            </div>
+            <button onclick="closeActionPopover(); handleUserSwitch(${row.pe})" class="px-2 py-1 rounded bg-blue-500/15 hover:bg-blue-500/25 text-blue-600 dark:text-blue-300 text-[10px] font-bold cursor-pointer shrink-0" title="View in Mobile App">
+              📱 App View
+            </button>
           </div>
 
           <div class="pt-1">
-            <div class="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Mark Off / Leave Request</div>
+            ${revertSection}
+            <div class="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Mark Off / Move to Off-Time</div>
             <button onclick="triggerLeaveAction('${div}', '${unit}', 'DAY_OFF_VAC')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-blue-500/10 flex items-center justify-between cursor-pointer">
               <span>🏖️ Day Off (Vacation)</span>
-              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded ${canTakeSpotLeave ? 'bg-emerald-500/15 text-emerald-600' : 'bg-amber-500/15 text-amber-600'}">${canTakeSpotLeave ? 'Open' : 'Min 32'}</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded ${canTakeSpotLeave ? 'bg-emerald-500/15 text-emerald-600' : 'bg-amber-500/15 text-amber-600'}">${canTakeSpotLeave ? 'Open' : `Min ${min}`}</span>
             </button>
             <button onclick="triggerLeaveAction('${div}', '${unit}', 'DAY_OFF_PERS')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-blue-500/10 flex items-center justify-between cursor-pointer">
               <span>📅 Personal Day Off</span>
-              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded ${canTakeSpotLeave ? 'bg-emerald-500/15 text-emerald-600' : 'bg-amber-500/15 text-amber-600'}">${canTakeSpotLeave ? 'Open' : 'Min 32'}</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded ${canTakeSpotLeave ? 'bg-emerald-500/15 text-emerald-600' : 'bg-amber-500/15 text-amber-600'}">${canTakeSpotLeave ? 'Open' : `Min ${min}`}</span>
             </button>
             <button onclick="triggerLeaveAction('${div}', '${unit}', 'DAY_OFF_FLSA')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-blue-500/10 flex items-center justify-between cursor-pointer">
               <span>⏱️ FLSA / Comp Time</span>
-              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded ${canTakeSpotLeave ? 'bg-emerald-500/15 text-emerald-600' : 'bg-amber-500/15 text-amber-600'}">${canTakeSpotLeave ? 'Open' : 'Min 32'}</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded ${canTakeSpotLeave ? 'bg-emerald-500/15 text-emerald-600' : 'bg-amber-500/15 text-amber-600'}">${canTakeSpotLeave ? 'Open' : `Min ${min}`}</span>
             </button>
             <button onclick="triggerLeaveAction('${div}', '${unit}', 'SICK')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 flex items-center justify-between cursor-pointer font-semibold text-red-600 dark:text-red-400">
               <span>🤒 Call In Sick Leave</span>
@@ -10716,58 +10827,159 @@
             </div>
           </div>
         `;
-      } else {
-        // Day Off Roster Popover (Triggered from bottom Scheduled Off-Time columns)
-        const item = app.dayOffRoster[div].find(o => o.homeUnit === unit);
-        if (!item) return;
+        positionPopoverNearEvent(event, 330, 268);
+        return;
+      }
+
+      if (mode === 'STATIC_OFF') {
+        const colKey = divOrCol;
+        const idx = parseInt(unitOrIdx, 10);
+        const rawStr = (app.offTimeSheet[colKey] || [])[idx];
+        const parsed = parseStaticOffTimeString(rawStr, colKey, idx);
+        if (!parsed) return;
 
         content.innerHTML = `
-          <div class="px-2.5 py-2 border-b border-[var(--border-grid)]">
-            <div class="font-bold text-[var(--text-main)]">${item.name} <span class="font-mono text-[var(--text-muted)]">#${item.pe}</span></div>
-            <div class="text-[10px] text-red-500 font-semibold">Currently Off: ${item.status} (Home Car ${unit})</div>
+          <div class="px-2.5 py-2 border-b border-[var(--border-grid)] flex items-center justify-between gap-2">
+            <div>
+              <div class="font-bold text-[var(--text-main)]">${parsed.name} ${parsed.pe ? `<span class="font-mono text-[var(--text-muted)]">#${parsed.pe}</span>` : ''}</div>
+              <div class="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">Scheduled Off: ${parsed.tag}${parsed.hrs ? ` (${parsed.hrs})` : ''}</div>
+            </div>
+            ${parsed.pe ? `
+              <button onclick="closeActionPopover(); handleUserSwitch(${parsed.pe})" class="px-2 py-1 rounded bg-blue-500/15 hover:bg-blue-500/25 text-blue-600 dark:text-blue-300 text-[10px] font-bold cursor-pointer shrink-0">
+                📱 App View
+              </button>
+            ` : ''}
           </div>
-          <div class="pt-1 space-y-0.5">
-            <button onclick="closeActionPopover(); restoreOfficerFromDayOff('${div}', '${unit}')" class="w-full text-left px-2.5 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 font-bold flex items-center justify-between cursor-pointer">
-              <span>🟢 Return to Work (${unit})</span>
-              <span class="text-[10px] font-mono">Restore</span>
+          <div class="pt-1.5 space-y-1">
+            <button onclick="closeActionPopover(); returnStaticOfficerToWork('${colKey}', ${idx}, null, false)" class="w-full text-left px-2.5 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 font-bold flex items-center justify-between cursor-pointer">
+              <span>🟢 Return to Work (Cancel Off-Time)</span>
+              <span class="text-[10px] font-mono">Auto-Car</span>
             </button>
-            <div class="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Change Leave Category</div>
-            <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'DAY_OFF_VAC')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
-              🏖️ Day Off (Vacation)
+            <div class="px-2.5 py-0.5 text-[10px] text-[var(--text-muted)] flex items-center justify-between gap-1">
+              <span>Or assign directly to division:</span>
+              <div class="flex items-center gap-1">
+                ${DIV_KEYS.map(d => `<button onclick="closeActionPopover(); returnStaticOfficerToWork('${colKey}', ${idx}, '${d}', false)" class="px-1.5 py-0.5 rounded bg-slate-500/15 hover:bg-emerald-500/25 font-mono font-bold text-[10px] cursor-pointer">${d}</button>`).join('')}
+              </div>
+            </div>
+            <button onclick="closeActionPopover(); returnStaticOfficerToWork('${colKey}', ${idx}, null, true)" class="w-full text-left px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 font-bold flex items-center justify-between cursor-pointer">
+              <span>⚡ Work Shift Hire-Back (Art. 35)</span>
+              <span class="text-[10px] font-mono">1.5x OT</span>
             </button>
-            <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'DAY_OFF_PERS')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
-              📅 Personal Day
+            <div class="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] border-t border-[var(--border-grid)]">Move to Off-Time Column</div>
+            <button onclick="closeActionPopover(); moveStaticOffTimeOfficer('${colKey}', ${idx}, 'dayOff', 'DAY OFF')" class="w-full text-left px-2.5 py-1 rounded-lg hover:bg-slate-500/10 cursor-pointer text-[11px]">
+              📅 Regular Day Off (Rotation)
             </button>
-            <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'DAY_OFF_FLSA')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
-              ⏱️ FLSA / Comp Time
+            <button onclick="closeActionPopover(); moveStaticOffTimeOfficer('${colKey}', ${idx}, 'vacation', 'VAC')" class="w-full text-left px-2.5 py-1 rounded-lg hover:bg-slate-500/10 cursor-pointer text-[11px]">
+              🏖️ Vacation / Personal / NFLSA
             </button>
-            <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'SICK')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
-              🤒 Sick Leave
+            <button onclick="closeActionPopover(); moveStaticOffTimeOfficer('${colKey}', ${idx}, 'sickAndLeave', 'SICK LEAVE')" class="w-full text-left px-2.5 py-1 rounded-lg hover:bg-slate-500/10 cursor-pointer text-[11px]">
+              🤒 Sick / Bereavement / Military
             </button>
-            <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'BEREAVEMENT')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
-              🕊️ Bereavement Leave
-            </button>
-            <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'UTB')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
-              🛡️ Union Time Bank
+            <button onclick="closeActionPopover(); moveStaticOffTimeOfficer('${colKey}', ${idx}, 'trainingAndSpecial', 'TRN')" class="w-full text-left px-2.5 py-1 rounded-lg hover:bg-slate-500/10 cursor-pointer text-[11px]">
+              🛡️ Training / Admin / Special
             </button>
           </div>
         `;
+        positionPopoverNearEvent(event, 320, 276);
+        return;
       }
 
-      menu.classList.remove('hidden');
+      // Dynamic Day Off Roster Popover (Triggered from bottom Scheduled Off-Time columns)
+      const div = divOrCol;
+      const unit = unitOrIdx;
+      const item = app.dayOffRoster[div].find(o => o.homeUnit === unit);
+      if (!item) return;
 
-      // Position near clicked caret button without overflowing viewport
-      const rect = event.currentTarget.getBoundingClientRect();
-      const menuWidth = 256;
-      const menuHeight = 310;
-      let left = rect.right - menuWidth;
-      let top = rect.bottom + 6;
-      if (left < 12) left = 12;
-      if (top + menuHeight > window.innerHeight - 12) {
-        top = Math.max(12, rect.top - menuHeight - 6);
-      }
-      menu.style.left = `${left}px`;
-      menu.style.top = `${top}px`;
+      content.innerHTML = `
+        <div class="px-2.5 py-2 border-b border-[var(--border-grid)] flex items-center justify-between gap-2">
+          <div>
+            <div class="font-bold text-[var(--text-main)]">${item.name} <span class="font-mono text-[var(--text-muted)]">#${item.pe}</span></div>
+            <div class="text-[10px] text-red-500 font-semibold">Currently Off: ${item.status} (Home Car ${unit})</div>
+          </div>
+          <button onclick="closeActionPopover(); handleUserSwitch(${item.pe})" class="px-2 py-1 rounded bg-blue-500/15 hover:bg-blue-500/25 text-blue-600 dark:text-blue-300 text-[10px] font-bold cursor-pointer shrink-0">
+            📱 App View
+          </button>
+        </div>
+        <div class="pt-1 space-y-0.5">
+          <button onclick="closeActionPopover(); restoreOfficerFromDayOff('${div}', '${unit}')" class="w-full text-left px-2.5 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 font-bold flex items-center justify-between cursor-pointer">
+            <span>🟢 Return to Work (${unit})</span>
+            <span class="text-[10px] font-mono">Restore</span>
+          </button>
+          <div class="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Change Leave Category</div>
+          <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'DAY_OFF_VAC')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
+            🏖️ Day Off (Vacation)
+          </button>
+          <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'DAY_OFF_PERS')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
+            📅 Personal Day
+          </button>
+          <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'DAY_OFF_FLSA')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
+            ⏱️ FLSA / Comp Time
+          </button>
+          <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'SICK')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
+            🤒 Sick Leave
+          </button>
+          <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'BEREAVEMENT')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
+            🕊️ Bereavement Leave
+          </button>
+          <button onclick="closeActionPopover(); handleDayOffActionSelect('${div}', '${unit}', 'UTB')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
+            🛡️ Union Time Bank
+          </button>
+        </div>
+      `;
+      positionPopoverNearEvent(event, 310, 268);
+    }
+
+    // Minimalistic Cross-Shift Hire-Back Popover
+    function openHireBackPopover(event, preferredDiv = null, preferredUnit = null) {
+      if (event) event.stopPropagation();
+      const content = document.getElementById('floatingMenuContent');
+      const count = getShiftCount();
+      const min = app.shiftMin;
+      const deficit = Math.max(0, min - count);
+
+      const otherShiftOfficers = MASTER_OPERATIONS_DIRECTORY.filter(
+        o => o.shift !== app.selectedShift && o.role === 'OFFICER' && !findOfficerByPe(o.pe)?.row
+      );
+
+      content.innerHTML = `
+        <div class="px-2.5 py-2 border-b border-[var(--border-grid)]">
+          <div class="flex items-center justify-between">
+            <span class="font-extrabold text-[var(--text-main)]">⚡ Cross-Shift Hire-Back</span>
+            <span class="px-1.5 py-0.2 rounded font-mono text-[10px] font-bold ${deficit > 0 ? 'bg-red-500/20 text-red-600 dark:text-red-300' : 'bg-emerald-500/15 text-emerald-600'}">
+              ${deficit > 0 ? `${deficit} Needed (${count}/${min})` : `Count ${count}/${min}`}
+            </span>
+          </div>
+          <div class="text-[10px] text-[var(--text-muted)] mt-0.5">
+            ${preferredUnit ? `Target Car: <strong>${preferredUnit} (${preferredDiv})</strong>` : 'Auto-assigns to open/floated car slot (PBA Art. 35)'}
+          </div>
+        </div>
+
+        <div class="pt-1.5 space-y-1">
+          <div class="px-2.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Quick Award (Other Shifts)</div>
+          ${HIREBACK_POOL.map((h, idx) => `
+            <button onclick="closeActionPopover(); awardCrossShiftHireBack(${h.pe}, '${h.name}', '${h.shift}', ${preferredDiv ? `'${preferredDiv}'` : 'null'}, ${preferredUnit ? `'${preferredUnit}'` : 'null'})" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-500/15 flex items-center justify-between cursor-pointer">
+              <div>
+                <span class="font-bold text-[var(--text-main)]">${h.name}</span>
+                <span class="font-mono text-[10px] text-[var(--text-muted)]">#${h.pe}</span>
+              </div>
+              <span class="px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-bold text-[9.5px]">${h.shift}-Shift • +Hire</span>
+            </button>
+          `).join('')}
+        </div>
+
+        <div class="pt-1.5 mt-1 border-t border-[var(--border-grid)] px-2 space-y-1.5">
+          <div class="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Or Pick Any B/C-Shift Officer</div>
+          <div class="flex items-center gap-1">
+            <select id="popoverCrossShiftSelect" class="flex-1 bg-[var(--bg-subtle)] border border-[var(--border-strong)] rounded-lg px-2 py-1 text-[11px] text-[var(--text-main)] focus:outline-none">
+              ${otherShiftOfficers.map(o => `<option value="${o.pe}|${o.name}|${o.shift}">[${o.shift}-Shift] ${o.name} (#${o.pe})</option>`).join('')}
+            </select>
+            <button onclick="const v=document.getElementById('popoverCrossShiftSelect').value.split('|'); closeActionPopover(); awardCrossShiftHireBack(parseInt(v[0],10), v[1], v[2], ${preferredDiv ? `'${preferredDiv}'` : 'null'}, ${preferredUnit ? `'${preferredUnit}'` : 'null'});" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] cursor-pointer shrink-0">
+              + Assign
+            </button>
+          </div>
+        </div>
+      `;
+      positionPopoverNearEvent(event, 340, 288);
     }
 
     function closeActionPopover() {
@@ -10781,7 +10993,7 @@
     }
 
     // =========================================================================
-    // OFFICER LEAVE / STATUS LOGIC
+    // OFFICER LEAVE / RETURN-TO-WORK / CROSS-SHIFT HIRE-BACK LOGIC
     // =========================================================================
     const LEAVE_CONFIG_MAP = {
       DAY_OFF_VAC: {
@@ -10833,6 +11045,164 @@
         article: 'Art. 16 §1'
       }
     };
+
+    function findTargetOpenSlotForReturnOrHireBack(preferredDiv = null, preferredUnit = null, officerPe = null) {
+      if (preferredDiv && preferredUnit) {
+        const exact = (app.officers[preferredDiv] || []).find(r => r.unit === preferredUnit && !r.name);
+        if (exact) return { div: preferredDiv, row: exact };
+      }
+      // Check if officer has a known home car on this shift that is currently open
+      if (officerPe) {
+        const known = MASTER_OPERATIONS_DIRECTORY.find(o => o.pe === officerPe && o.shift === app.selectedShift && o.unit && o.unit !== 'OFF');
+        if (known && known.div && app.officers[known.div]) {
+          const homeSlot = app.officers[known.div].find(r => r.unit === known.unit && !r.name);
+          if (homeSlot) return { div: known.div, row: homeSlot };
+        }
+      }
+      // Prefer a car slot that was floated out (so filling it covers the open car)
+      const searchDivs = preferredDiv ? [preferredDiv, ...DIV_KEYS.filter(d => d !== preferredDiv)] : DIV_KEYS;
+      for (const div of searchDivs) {
+        const floatedOrigin = app.officers[div].find(r => !r.name && r.floatedTo);
+        if (floatedOrigin) return { div, row: floatedOrigin };
+      }
+      // Otherwise pick the first open non-bid car slot in the preferred division (or any division)
+      for (const div of searchDivs) {
+        const openRow = app.officers[div].find(r => r.unit && !r.name && !r.bidCar && !r.sectionHeader)
+                     || app.officers[div].find(r => r.unit && !r.name && !r.sectionHeader);
+        if (openRow) return { div, row: openRow };
+      }
+      return null;
+    }
+
+    // Return a pre-scheduled off-time officer (like D. Engelman #1586) to active duty on the shift
+    function returnStaticOfficerToWork(colKey, idx, preferredDiv = null, asHireBack = false) {
+      const list = app.offTimeSheet[colKey] || [];
+      if (idx < 0 || idx >= list.length) return;
+      const rawStr = list[idx];
+      const parsed = parseStaticOffTimeString(rawStr, colKey, idx);
+      if (!parsed) return;
+
+      const slot = findTargetOpenSlotForReturnOrHireBack(preferredDiv, null, parsed.pe);
+      if (!slot) return;
+
+      const countBefore = getShiftCount();
+      list.splice(idx, 1);
+
+      slot.row.name = parsed.name;
+      slot.row.pe = parsed.pe || 1999;
+      slot.row.partner = '';
+      slot.row.isHireBack = Boolean(asHireBack);
+      slot.row.isReturnedOffTime = !asHireBack;
+      slot.row.returnedMeta = { rawStr, colKey, tag: parsed.tag };
+      slot.row.assign = asHireBack ? 'HIREBACK' : 'RTW';
+      slot.row.floatedTo = null;
+
+      recalculateFloats();
+      const countAfter = getShiftCount();
+
+      app.toastData = {
+        status: 'approved',
+        title: `${parsed.name} (#${parsed.pe}) Returned to Duty → Assigned to ${slot.row.unit} (${slot.div})`,
+        step1: `Step 1 (Off-Time Canceled): ${parsed.name} (#${parsed.pe}) removed from bottom "${parsed.tag}" column.`,
+        step2: `Step 2 (Shift Assignment): Assigned to Unit ${slot.row.unit} (${slot.div} Division • Dist ${slot.row.district || 'Ops'}).`,
+        step3: `Step 3 (Shift Count Updated): Shift Count increased ${countBefore} → ${countAfter} (Minimum ${app.shiftMin}).`
+      };
+
+      app.auditEntries.unshift({
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        msg: `${parsed.name} (#${parsed.pe}) canceled ${parsed.tag} and returned to work in ${slot.row.unit} (${slot.div}). Shift Count: ${countBefore} → ${countAfter}.`,
+        tag: asHireBack ? 'Art. 35 Hire-Back' : 'Return to Work'
+      });
+
+      renderAll();
+    }
+
+    function moveStaticOffTimeOfficer(fromColKey, idx, toColKey, newTag) {
+      const list = app.offTimeSheet[fromColKey] || [];
+      if (idx < 0 || idx >= list.length) return;
+      const rawStr = list[idx];
+      const parsed = parseStaticOffTimeString(rawStr, fromColKey, idx);
+      if (!parsed) return;
+      list.splice(idx, 1);
+      const hrsPart = parsed.hrs ? ` ${parsed.hrs}` : '';
+      const updatedStr = `${parsed.name} (${parsed.pe})${hrsPart} [${newTag}]`;
+      app.offTimeSheet[toColKey].unshift(updatedStr);
+      renderAll();
+    }
+
+    function cancelTemporaryDutyRow(div, unit) {
+      const row = app.officers[div].find(r => r.unit === unit);
+      if (!row || !row.name) return;
+      const name = row.name;
+      const pe = row.pe;
+      const wasHireBack = row.isHireBack;
+      const meta = row.returnedMeta;
+
+      row.name = '';
+      row.pe = null;
+      row.partner = '';
+      row.assign = '';
+      row.isHireBack = false;
+      row.isReturnedOffTime = false;
+      row.returnedMeta = null;
+
+      if (meta && meta.rawStr && meta.colKey) {
+        app.offTimeSheet[meta.colKey].unshift(meta.rawStr);
+      }
+
+      app.auditEntries.unshift({
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        msg: wasHireBack
+          ? `Canceled Hire-Back assignment for ${name} (#${pe}) in ${unit} (${div}).`
+          : `Returned ${name} (#${pe}) from ${unit} (${div}) back to Scheduled Off-Time (${meta?.tag || 'OFF'}).`,
+        tag: wasHireBack ? 'Hire-Back Canceled' : 'Off-Time Restored'
+      });
+
+      recalculateFloats();
+    }
+
+    function awardCrossShiftHireBack(pe, name, fromShift = 'B', preferredDiv = null, preferredUnit = null) {
+      // Check if this officer is already on duty on the current worksheet
+      const existing = findOfficerByPe(pe);
+      if (existing && existing.state === 'ON_DUTY') return;
+
+      // If they were in the static off-time sheet on this shift, remove them from there
+      if (existing && existing.state === 'STATIC_OFF') {
+        app.offTimeSheet[existing.colKey].splice(existing.idx, 1);
+      }
+
+      const slot = findTargetOpenSlotForReturnOrHireBack(preferredDiv, preferredUnit, pe);
+      if (!slot) return;
+
+      const countBefore = getShiftCount();
+      slot.row.name = name;
+      slot.row.pe = pe;
+      slot.row.partner = '';
+      slot.row.isHireBack = true;
+      slot.row.isReturnedOffTime = false;
+      slot.row.hireBackShift = fromShift;
+      slot.row.assign = `HB (${fromShift})`;
+      slot.row.floatedTo = null;
+
+      recalculateFloats();
+      const countAfter = getShiftCount();
+
+      app.toastData = {
+        status: 'approved',
+        title: `Hire-Back Filled: [${fromShift}-Shift] ${name} (#${pe}) Assigned to ${slot.row.unit} (${slot.div})`,
+        step1: `Step 1 (Cross-Shift Call-In): ${name} (#${pe}) from ${fromShift}-Shift accepted the Hire-Back (PBA Art. 35 / FOPLC Art. 24).`,
+        step2: `Step 2 (Unit Assignment): Placed into Unit ${slot.row.unit} (${slot.div} Division).`,
+        step3: `Step 3 (Shift Count Restored): Shift Count ${countBefore} → ${countAfter} (Minimum ${app.shiftMin}).`
+      };
+
+      app.auditEntries.unshift({
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        msg: `Cross-Shift Hire-Back Awarded (Art. 35): [${fromShift}-Shift] ${name} (#${pe}) assigned to ${slot.row.unit} (${slot.div}). Shift Count: ${countBefore} → ${countAfter}.`,
+        tag: 'Art. 35 §4–5'
+      });
+
+      renderAll();
+    }
 
     function handleOfficerStatusSelect(div, unit, actionValue) {
       if (!actionValue || actionValue === 'ON_DUTY') return;
@@ -10904,6 +11274,22 @@
       const row = app.officers[div].find(r => r.unit === unit);
       if (!row || !row.name) return;
 
+      // If this was a temporary row (Returned Off-Time or Hire-Back), put them into the target off-time category and free the car slot
+      if (row.isReturnedOffTime || row.isHireBack) {
+        const offName = row.name;
+        const offPe = row.pe;
+        row.name = '';
+        row.pe = null;
+        row.partner = '';
+        row.assign = '';
+        row.isHireBack = false;
+        row.isReturnedOffTime = false;
+        row.returnedMeta = null;
+        app.offTimeSheet[leaveConfig.categoryCol || 'vacation'].unshift(`${offName} (${offPe}) 8.5 hrs [${leaveConfig.shortCode}]`);
+        recalculateFloats();
+        return;
+      }
+
       const countBefore = getShiftCount();
       const offName = row.name;
       const offPe = row.pe;
@@ -10931,7 +11317,7 @@
         : `Step 3 (District Check): District still covered; no float required.`;
 
       const countExplanation = countAfter < app.shiftMin
-        ? `Step 1 (Count Check): Approved (${leaveConfig.article}). Shift Count ${countBefore} → ${countAfter} (below Min ${app.shiftMin} → Hire-Back posted per Art. 35).`
+        ? `Step 1 (Count Check): Approved (${leaveConfig.article}). Shift Count ${countBefore} → ${countAfter} (below Min ${app.shiftMin} → Click "⚡ Cross-Shift Hire-Back ▾" to fill!).`
         : `Step 1 (Count Check): Approved! Shift Count ${countBefore} → ${countAfter} (meets Minimum ${app.shiftMin}).`;
 
       app.toastData = {
@@ -11002,7 +11388,7 @@
       app.toastData = {
         status: 'approved',
         title: 'Shift Minimum Set to 31 (Shift Count 32 → +1 Open Day-Off Slot)',
-        step1: 'Now when Maurer (#1883) selects "🏖️ Day Off (Vacation)" from his ▾ caret menu or mobile app, the count check approves immediately (32 → 31 = MINIMUM COUNT), moves him to Day Off, and floats Sikorski (#2078) into M419!',
+        step1: 'Now when Maurer (#1883) selects "🏖️ Day Off (Vacation)" from his ▾ caret menu or mobile app, the count check approves immediately (32 → 31 = MINIMUM COUNT), moves him to the Vacation column, and floats Sikorski (#2078) into M419!',
         step2: '',
         step3: ''
       };
@@ -11018,42 +11404,7 @@
     function fillHireBackNow(candIdx) {
       const cand = HIREBACK_POOL[candIdx];
       if (!cand) return;
-
-      let placedDiv = 'NE';
-      let placedRow = null;
-      for (const div of DIV_KEYS) {
-        const floatedOrigin = app.officers[div].find(r => !r.name && r.floatedTo);
-        if (floatedOrigin) {
-          placedDiv = div;
-          placedRow = floatedOrigin;
-          break;
-        }
-      }
-      if (!placedRow) {
-        for (const div of DIV_KEYS) {
-          const openRow = app.officers[div].find(r => r.unit && !r.name && !r.bidCar);
-          if (openRow) {
-            placedDiv = div;
-            placedRow = openRow;
-            break;
-          }
-        }
-      }
-      if (!placedRow) return;
-
-      placedRow.name = cand.name;
-      placedRow.pe = cand.pe;
-      placedRow.isHireBack = true;
-      placedRow.assign = 'HIREBACK';
-      placedRow.floatedTo = null;
-
-      app.auditEntries.unshift({
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        msg: `Hire-Back Awarded (Art. 35): ${cand.name} (#${cand.pe}) assigned to ${placedRow.unit} (${placedDiv}). Shift Count: ${getShiftCount()}.`,
-        tag: 'Art. 35 §4–5'
-      });
-
-      renderAll();
+      awardCrossShiftHireBack(cand.pe, cand.name, cand.shift || 'B', null, null);
     }
 
     // =========================================================================
@@ -11080,15 +11431,15 @@
       const textEl = document.getElementById('sheetMinText');
 
       if (count === min) {
-        bannerEl.className = 'px-3.5 py-1.5 rounded-lg font-extrabold text-xs tracking-wider uppercase flex items-center gap-2 bg-amber-400 text-slate-950 border border-amber-500 shadow-xs';
+        bannerEl.className = 'px-3.5 py-1.5 rounded-lg font-extrabold text-xs tracking-wider uppercase flex items-center gap-2 bg-amber-400 text-slate-950 border border-amber-500 shadow-xs cursor-pointer';
         dotEl.className = 'w-2 h-2 rounded-full bg-slate-950';
         textEl.textContent = 'MINIMUM COUNT';
       } else if (count < min) {
-        bannerEl.className = 'px-3.5 py-1.5 rounded-lg font-extrabold text-xs tracking-wider uppercase flex items-center gap-2 bg-red-600 text-white border border-red-700 shadow-xs';
+        bannerEl.className = 'px-3.5 py-1.5 rounded-lg font-extrabold text-xs tracking-wider uppercase flex items-center gap-2 bg-red-600 text-white border border-red-700 shadow-xs cursor-pointer hover:bg-red-500 transition';
         dotEl.className = 'w-2 h-2 rounded-full bg-white animate-ping';
-        textEl.textContent = `BELOW MINIMUM (${count}/${min}) • HIRE BACK`;
+        textEl.textContent = `BELOW MINIMUM (${count}/${min}) • + HIRE BACK ▾`;
       } else {
-        bannerEl.className = 'px-3.5 py-1.5 rounded-lg font-extrabold text-xs tracking-wider uppercase flex items-center gap-2 bg-emerald-500 text-slate-950 border border-emerald-600 shadow-xs';
+        bannerEl.className = 'px-3.5 py-1.5 rounded-lg font-extrabold text-xs tracking-wider uppercase flex items-center gap-2 bg-emerald-500 text-slate-950 border border-emerald-600 shadow-xs cursor-pointer';
         dotEl.className = 'w-2 h-2 rounded-full bg-slate-950';
         textEl.textContent = `ABOVE MINIMUM (+${count - min} OPEN)`;
       }
@@ -11259,7 +11610,7 @@
     }
 
     // =========================================================================
-    // RENDER OFFICER ROWS (With Subtle ▾ Caret Trigger)
+    // RENDER OFFICER ROWS (With Subtle ▾ Caret Trigger on ALL Officers)
     // =========================================================================
     function renderPaperOfficerRows() {
       const tbody = document.getElementById('paperOfficersBody');
@@ -11275,7 +11626,7 @@
             return;
           }
           const isOccupied = Boolean(r.name && r.pe !== null);
-          const hasPermission = isOccupied && (app.loggedInPe === 'COD' || r.pe === app.loggedInPe);
+          const hasPermission = isOccupied;
           const isSpecificallyLoggedInOfficer = isOccupied && app.loggedInPe !== 'COD' && r.pe === app.loggedInPe;
           const isFloatedHere = Boolean(r.floatedFrom);
           const wasFloatedAway = Boolean(r.floatedTo);
@@ -11283,7 +11634,7 @@
           const unitCls = r.bidCar ? 'unit-cell unit-bid-car' : 'unit-cell';
           let cellStateCls = '';
           if (isSpecificallyLoggedInOfficer) cellStateCls = 'row-logged-in';
-          else if (isFloatedHere) cellStateCls = 'row-floated-in';
+          else if (isFloatedHere || r.isHireBack || r.isReturnedOffTime) cellStateCls = 'row-floated-in';
           else if (wasFloatedAway) cellStateCls = 'row-floated-out';
 
           let officerHtml = '';
@@ -11314,7 +11665,12 @@
               </div>
             `;
           } else if (wasFloatedAway) {
-            officerHtml = `<span class="text-[10.5px] italic text-amber-600 dark:text-amber-400">↪ Floated to <strong>${r.floatedTo.unit} (${r.floatedTo.div})</strong></span>`;
+            officerHtml = `
+              <div class="flex items-center justify-between gap-1">
+                <span class="text-[10.5px] italic text-amber-600 dark:text-amber-400 truncate">↪ Floated to <strong>${r.floatedTo.unit} (${r.floatedTo.div})</strong></span>
+                <button type="button" onclick="openHireBackPopover(event, '${div}', '${r.unit}')" class="px-1.5 py-0.2 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 font-mono font-bold text-[9.5px] cursor-pointer shrink-0" title="Assign Cross-Shift Hire-Back to this open car">+ Hire-Back ▾</button>
+              </div>
+            `;
           } else if (i === 30 && div === 'NW') {
             officerHtml = `<span class="text-[10px] text-[var(--text-faint)] font-mono">11/14/2026</span>`;
           }
@@ -11355,9 +11711,9 @@
       return 'vacation';
     }
 
-    function formatStaticOffTimeEntry(rawStr, colKey) {
+    function formatStaticOffTimeEntry(rawStr, colKey, idx) {
       if (!rawStr) return '';
-      const m = rawStr.match(/^(.+?)\s*\((\d+)\)\s*(.*?)(?:\[(.+?)\])?\s*$/);
+      const parsed = parseStaticOffTimeString(rawStr);
       const pillStyles = {
         dayOff: 'bg-slate-500/15 text-[var(--text-muted)]',
         vacation: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
@@ -11365,13 +11721,12 @@
         trainingAndSpecial: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
       };
       const pillCls = pillStyles[colKey] || pillStyles.dayOff;
-      if (!m) {
-        return `<div class="flex items-center justify-between gap-1"><span class="font-medium text-[var(--text-main)] truncate">${rawStr}</span></div>`;
+      const caretBtn = `<button type="button" onclick="openOfficerActionPopover(event, 'STATIC_OFF', '${colKey}', ${idx})" class="caret-btn" title="Return to Work or Change Off-Time Status">▾</button>`;
+
+      if (!parsed || !parsed.pe) {
+        return `<div class="flex items-center justify-between gap-1"><span class="font-medium text-[var(--text-main)] truncate">${rawStr}</span>${caretBtn}</div>`;
       }
-      const name = m[1].trim();
-      const pe = m[2].trim();
-      const hrs = (m[3] || '').trim();
-      const tag = (m[4] || '').trim();
+      const { name, pe, hrs, tag } = parsed;
       const hrsSpan = hrs ? `<span class="font-mono text-[10px] text-[var(--text-muted)]">${hrs}</span>` : '';
       const tagSpan = tag
         ? `<span class="px-1.5 py-0.2 rounded font-mono font-bold text-[9.5px] ${pillCls}">${tag}</span>`
@@ -11385,6 +11740,7 @@
           <div class="flex items-center gap-1 shrink-0">
             ${hrsSpan}
             ${tagSpan}
+            ${caretBtn}
           </div>
         </div>
       `;
@@ -11392,10 +11748,7 @@
 
     function formatDynamicMarkedOffEntry(item) {
       const div = item.div;
-      const hasPerm = app.loggedInPe === 'COD' || item.pe === app.loggedInPe;
-      const caretBtn = hasPerm
-        ? `<button type="button" onclick="openOfficerActionPopover(event, 'DAY_OFF', '${div}', '${item.homeUnit}')" class="caret-btn" title="Return to Work (${item.homeUnit}) or Change Leave Category">▾</button>`
-        : '';
+      const caretBtn = `<button type="button" onclick="openOfficerActionPopover(event, 'DAY_OFF', '${div}', '${item.homeUnit}')" class="caret-btn" title="Return to Work (${item.homeUnit}) or Change Leave Category">▾</button>`;
       return `
         <div class="flex items-center justify-between gap-1">
           <div class="flex items-center gap-1.5 truncate">
@@ -11414,8 +11767,7 @@
     function renderPaperScheduledOffTimeRows() {
       const tbody = document.getElementById('paperScheduledOffTimeBody');
       if (!tbody) return;
-      const sched = ALL_SCHEDULES[app.activeScheduleId];
-      const sheet = sched.offTimeSheet || { dayOff: [], vacation: [], sickAndLeave: [], trainingAndSpecial: [] };
+      const sheet = app.offTimeSheet || { dayOff: [], vacation: [], sickAndLeave: [], trainingAndSpecial: [] };
 
       const colKeys = ['dayOff', 'vacation', 'sickAndLeave', 'trainingAndSpecial'];
       const cols = {
@@ -11436,9 +11788,9 @@
 
       // 2. Append scheduled shift off-time entries underneath in each category column
       for (const k of colKeys) {
-        for (const rawStr of (sheet[k] || [])) {
-          cols[k].push({ type: 'static', raw: rawStr, colKey: k });
-        }
+        (sheet[k] || []).forEach((rawStr, staticIdx) => {
+          cols[k].push({ type: 'static', raw: rawStr, colKey: k, staticIdx });
+        });
         const badgeEl = document.getElementById(`offColCount-${k}`);
         if (badgeEl) badgeEl.textContent = cols[k].length;
       }
@@ -11464,7 +11816,10 @@
             const bgCls = isMe ? 'row-logged-in' : 'bg-[var(--dayoff-bg)]';
             html += `<td colspan="3" class="${bgCls} ${sepCls}">${formatDynamicMarkedOffEntry(entry.item)}</td>`;
           } else {
-            html += `<td colspan="3" class="${sepCls} text-[11px]">${formatStaticOffTimeEntry(entry.raw, entry.colKey)}</td>`;
+            const parsed = parseStaticOffTimeString(entry.raw);
+            const isMe = parsed && app.loggedInPe !== 'COD' && parsed.pe === app.loggedInPe;
+            const bgCls = isMe ? 'row-logged-in' : '';
+            html += `<td colspan="3" class="${bgCls} ${sepCls} text-[11px]">${formatStaticOffTimeEntry(entry.raw, entry.colKey, entry.staticIdx)}</td>`;
           }
         });
         html += '</tr>';
@@ -11480,19 +11835,76 @@
       if (!container) return;
 
       const targetPe = app.loggedInPe === 'COD' ? 1883 : app.loggedInPe;
-      const loc = findOfficerByPe(targetPe);
+      const loc = findOfficerByPe(targetPe) || findOfficerByPe(1883);
       if (!loc) return;
 
       const canSpotLeave = count > min;
+      const neededHireBacks = Math.max(0, min - count);
+
+      // Minimalist 3-pill quick-switcher at top of mobile screen so user can test On-Duty, Vacation Return (Engelman #1586), or Cross-Shift Hire-Back (Aguilera #1997) in 1 tap
+      const roleSwitcherBar = `
+        <div class="p-1.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+          <div class="flex items-center justify-between px-1">
+            <span class="text-[9.5px] uppercase tracking-wider text-slate-400 font-bold">Switch Mobile Officer View</span>
+            <span class="text-[9.5px] font-mono text-blue-400">PE #${targetPe}</span>
+          </div>
+          <div class="grid grid-cols-3 gap-1 text-[10px]">
+            <button onclick="switchUserRole('1883')" class="px-1.5 py-1 rounded-lg font-bold truncate cursor-pointer transition ${targetPe === 1883 ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
+              👮 Maurer #1883
+            </button>
+            <button onclick="switchUserRole('1586')" class="px-1.5 py-1 rounded-lg font-bold truncate cursor-pointer transition ${targetPe === 1586 ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
+              🏖️ Engelman #1586
+            </button>
+            <button onclick="switchUserRole('1997')" class="px-1.5 py-1 rounded-lg font-bold truncate cursor-pointer transition ${targetPe === 1997 ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
+              ⚡ Aguilera B-Shift
+            </button>
+          </div>
+        </div>
+      `;
+
+      // Compact Open Hire-Back Broadcast banner when shift is below minimum
+      const hireBackBroadcastBanner = neededHireBacks > 0
+        ? `
+          <div class="p-2.5 rounded-xl bg-red-950/80 border border-red-500/40 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-red-300 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-red-400 animate-ping"></span>
+                Open Hire-Back Broadcast (${count}/${min})
+              </span>
+              <span class="text-[9.5px] font-mono text-amber-300">Art. 35 §4</span>
+            </div>
+            <div class="text-[10.5px] text-slate-200 leading-snug">
+              Cross-shift officers can claim this open Hire-Back now:
+            </div>
+            <div class="flex flex-wrap gap-1 pt-0.5">
+              ${HIREBACK_POOL.slice(0, 3).map((h, idx) => `
+                <button onclick="fillHireBackNow(${idx})" class="px-2 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[10px] cursor-pointer">
+                  ⚡ ${h.name} (#${h.pe} • ${h.shift})
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `
+        : '';
 
       if (loc.state === 'ON_DUTY') {
         const r = loc.row;
         const isFloated = Boolean(r.floatedFrom);
         const divName = { NW: 'Northwest', NE: 'Northeast', SW: 'Southwest', SE: 'Southeast' }[loc.div];
+        const specialBadge = r.isHireBack
+          ? `⚡ Cross-Shift Hire-Back (${r.hireBackShift || 'OT'})`
+          : r.isReturnedOffTime
+            ? `🟢 Returned from ${r.returnedMeta ? r.returnedMeta.tag : 'Off-Time'}`
+            : isFloated
+              ? '⚡ Floated Assignment'
+              : '🟢 Active Patrol Assignment';
 
         container.innerHTML = `
+          ${roleSwitcherBar}
+          ${hireBackBroadcastBanner}
+
           <!-- Officer Identity Card -->
-          <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+          <div class="p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
             <div class="flex items-center justify-between">
               <div>
                 <span class="text-[10px] uppercase tracking-wider text-blue-400 font-bold">Logged-In Officer</span>
@@ -11505,32 +11917,38 @@
             </div>
 
             <!-- Current Car Assignment Box -->
-            <div class="p-3 rounded-xl ${isFloated ? 'bg-amber-500/15 border border-amber-500/40' : 'bg-blue-600/15 border border-blue-500/30'} flex items-center justify-between">
+            <div class="p-2.5 rounded-xl ${isFloated || r.isHireBack || r.isReturnedOffTime ? 'bg-amber-500/15 border border-amber-500/40' : 'bg-blue-600/15 border border-blue-500/30'} flex items-center justify-between">
               <div>
-                <div class="text-[10px] uppercase font-bold ${isFloated ? 'text-amber-300' : 'text-blue-300'}">
-                  ${isFloated ? '⚡ Floated Assignment' : '🟢 Active Patrol Assignment'}
+                <div class="text-[10px] uppercase font-bold ${isFloated || r.isHireBack || r.isReturnedOffTime ? 'text-amber-300' : 'text-blue-300'}">
+                  ${specialBadge}
                 </div>
-                <div class="text-lg font-black font-mono text-white mt-0.5">
+                <div class="text-base font-black font-mono text-white mt-0.5">
                   Unit ${loc.unit} <span class="text-xs font-normal text-slate-300">(${divName})</span>
                 </div>
                 ${isFloated ? `<div class="text-[10px] text-amber-200 mt-0.5">Floated from Home Car ${r.floatedFrom.unit} (${r.floatedFrom.div}) per Art. 37 §5</div>` : `<div class="text-[10px] text-slate-400 mt-0.5">${ALL_SCHEDULES[app.activeScheduleId].shiftCode}-Shift • ${ALL_SCHEDULES[app.activeScheduleId].shiftHours} • Dist ${r.district}</div>`}
               </div>
-              <div class="w-10 h-10 rounded-xl bg-slate-900/80 flex items-center justify-center font-mono font-black text-sm border border-slate-700">
+              <div class="w-9 h-9 rounded-xl bg-slate-900/80 flex items-center justify-center font-mono font-black text-sm border border-slate-700">
                 ${r.district}
               </div>
             </div>
+
+            ${(r.isHireBack || r.isReturnedOffTime) ? `
+              <button onclick="cancelTemporaryDutyRow('${loc.div}', '${loc.unit}')" class="w-full py-2 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-bold text-xs cursor-pointer">
+                ↩ ${r.isHireBack ? 'Cancel Hire-Back Assignment' : `Restore to ${r.returnedMeta ? r.returnedMeta.tag : 'Vacation'} List`}
+              </button>
+            ` : ''}
           </div>
 
           <!-- Shift Staffing Meter -->
-          <div class="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+          <div class="p-2.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
             <div>
               <div class="text-[10px] text-slate-400 uppercase font-bold">Shift Staffing Count</div>
               <div class="text-xs font-semibold text-white mt-0.5">
                 Count: <span class="font-mono font-bold">${count}</span> / Min: <span class="font-mono font-bold">${min}</span>
               </div>
             </div>
-            <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold ${canSpotLeave ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-400/20 text-amber-300'}">
-              ${canSpotLeave ? `+${count - min} Leave Slot Open` : 'At Minimum Count'}
+            <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold ${canSpotLeave ? 'bg-emerald-500/20 text-emerald-300' : count === min ? 'bg-amber-400/20 text-amber-300' : 'bg-red-500/20 text-red-300'}">
+              ${canSpotLeave ? `+${count - min} Leave Slot Open` : count === min ? 'At Minimum Count' : `Below Min (${count}/${min})`}
             </span>
           </div>
 
@@ -11539,15 +11957,15 @@
             <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">
               Quick Officer Actions (Tap to Submit)
             </div>
-            <button onclick="handleOfficerStatusSelect('${loc.div}', '${loc.unit}', 'SICK')" class="w-full p-3 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 flex items-center justify-between text-left transition cursor-pointer">
+            <button onclick="handleOfficerStatusSelect('${loc.div}', '${loc.unit}', 'SICK')" class="w-full p-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 flex items-center justify-between text-left transition cursor-pointer">
               <div>
                 <div class="font-bold text-red-300">🤒 Call In Sick Leave</div>
-                <div class="text-[10px] text-slate-400">Moves you to Day Off &amp; auto-floats coverage</div>
+                <div class="text-[10px] text-slate-400">Moves you to Sick column &amp; auto-floats coverage</div>
               </div>
               <span class="text-xs text-red-300 font-bold">→</span>
             </button>
 
-            <button onclick="handleOfficerStatusSelect('${loc.div}', '${loc.unit}', 'DAY_OFF_VAC')" class="w-full p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 flex items-center justify-between text-left transition cursor-pointer">
+            <button onclick="handleOfficerStatusSelect('${loc.div}', '${loc.unit}', 'DAY_OFF_VAC')" class="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 flex items-center justify-between text-left transition cursor-pointer">
               <div>
                 <div class="font-bold text-white">🏖️ Request Day Off (Vacation)</div>
                 <div class="text-[10px] text-slate-400">Checks Shift Minimum (${count}/${min}) per Art. 43</div>
@@ -11557,30 +11975,102 @@
               </span>
             </button>
 
-            <button onclick="handleOfficerStatusSelect('${loc.div}', '${loc.unit}', 'DAY_OFF_PERS')" class="w-full p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 flex items-center justify-between text-left transition cursor-pointer">
+            <button onclick="handleOfficerStatusSelect('${loc.div}', '${loc.unit}', 'DAY_OFF_PERS')" class="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 flex items-center justify-between text-left transition cursor-pointer">
               <div>
                 <div class="font-bold text-white">📅 Request Personal Day</div>
                 <div class="text-[10px] text-slate-400">1-hr or full shift • Subject to minimum count</div>
               </div>
               <span class="text-xs text-slate-400">→</span>
             </button>
+          </div>
+        `;
+      } else if (loc.state === 'STATIC_OFF') {
+        // Pre-scheduled off-time officer (e.g., D. Engelman #1586 on VAC or RDO)
+        const item = loc.item;
+        container.innerHTML = `
+          ${roleSwitcherBar}
+          ${hireBackBroadcastBanner}
 
-            <button onclick="handleOfficerStatusSelect('${loc.div}', '${loc.unit}', 'BEREAVEMENT')" class="w-full p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 flex items-center justify-between text-left transition cursor-pointer">
-              <div>
-                <div class="font-bold text-white">🕊️ Bereavement Leave (Art. 45)</div>
-                <div class="text-[10px] text-slate-400">Bypasses minimum count automatically</div>
+          <div class="p-3.5 rounded-2xl bg-blue-950/60 border border-blue-500/40 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-[10px]">
+                🏖️ SCHEDULED OFF: ${item.tag || 'DAY OFF'}
+              </span>
+              <span class="font-mono text-[11px] text-slate-400">PE #${item.pe}</span>
+            </div>
+            <div>
+              <div class="text-base font-extrabold text-white">${item.name}</div>
+              <div class="text-xs text-blue-300 font-semibold mt-0.5">
+                Current Status: ${item.tag || 'Off-Time'} ${item.hrs ? `(${item.hrs})` : ''}
               </div>
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300">Exempt</span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300">
+              Want to cancel your scheduled <strong>${item.tag || 'Day Off'}</strong> and return to work on ${app.selectedShift}-Shift?
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-1">
+            <button onclick="returnStaticOfficerToWork('${loc.colKey}', ${loc.idx}, null, false)" class="w-full p-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-center shadow-lg transition cursor-pointer">
+              🟢 Cancel ${item.tag || 'Off-Time'} &amp; Return to Work
             </button>
+            <div class="grid grid-cols-4 gap-1">
+              ${DIV_KEYS.map(d => `
+                <button onclick="returnStaticOfficerToWork('${loc.colKey}', ${loc.idx}, '${d}', false)" class="py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-[10px] cursor-pointer">
+                  + ${d} Car
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (loc.state === 'OTHER_SHIFT') {
+        // Cross-shift officer (e.g., B-Shift Aguilera #1997 viewing A-Shift Hire-Backs)
+        const item = loc.item;
+        container.innerHTML = `
+          ${roleSwitcherBar}
+
+          <div class="p-3.5 rounded-2xl bg-amber-950/50 border border-amber-500/40 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-[10px]">
+                ⚡ ${item.shift}-SHIFT OFFICER (CROSS-SHIFT VIEW)
+              </span>
+              <span class="font-mono text-[11px] text-slate-400">PE #${item.pe}</span>
+            </div>
+            <div>
+              <div class="text-base font-extrabold text-white">${item.name}</div>
+              <div class="text-xs text-amber-300 font-semibold mt-0.5">
+                Viewing ${app.selectedShift}-Shift Staffing: Count ${count} / Min ${min}
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300">
+              ${neededHireBacks > 0
+                ? `<span class="text-red-300 font-bold">🚨 ${neededHireBacks} Open Hire-Back Needed!</span> Claim this overtime slot per Art. 35 §4 to restore ${app.selectedShift}-Shift to minimum count.`
+                : `${app.selectedShift}-Shift is currently at ${count}/${min}. You can still volunteer for a Cross-Shift Hire-Back slot below:`}
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-1">
+            <button onclick="awardCrossShiftHireBack(${item.pe}, '${item.name}', '${item.shift}', null, null)" class="w-full p-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-center shadow-lg transition cursor-pointer">
+              ⚡ Claim &amp; Work ${app.selectedShift}-Shift Hire-Back (1.5x OT)
+            </button>
+            <div class="grid grid-cols-4 gap-1">
+              ${DIV_KEYS.map(d => `
+                <button onclick="awardCrossShiftHireBack(${item.pe}, '${item.name}', '${item.shift}', '${d}', null)" class="py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-300 font-bold text-[10px] cursor-pointer">
+                  + ${d} Car
+                </button>
+              `).join('')}
+            </div>
           </div>
         `;
       } else {
-        // Officer is currently in Day Off Roster!
+        // Officer is currently in Dynamic Day Off Roster!
         const item = loc.item;
         const covMove = app.floatedMoves.find(m => m.toUnit === loc.unit);
 
         container.innerHTML = `
-          <div class="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 space-y-2.5">
+          ${roleSwitcherBar}
+          ${hireBackBroadcastBanner}
+
+          <div class="p-3.5 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 space-y-2.5">
             <div class="flex items-center justify-between">
               <span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">
                 ✓ LEAVE APPROVED
@@ -11599,8 +12089,8 @@
             </div>
           </div>
 
-          <div class="space-y-2 pt-2">
-            <button onclick="restoreOfficerFromDayOff('${loc.div}', '${loc.unit}')" class="w-full p-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-center shadow-lg transition cursor-pointer">
+          <div class="space-y-2 pt-1">
+            <button onclick="restoreOfficerFromDayOff('${loc.div}', '${loc.unit}')" class="w-full p-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-center shadow-lg transition cursor-pointer">
               ↩ Cancel Leave &amp; Return to Duty (${loc.unit})
             </button>
           </div>
