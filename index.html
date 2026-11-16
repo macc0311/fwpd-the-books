@@ -10241,14 +10241,7 @@
     let INITIAL_COMMAND = ALL_SCHEDULES.A_11_15.command;
     let INITIAL_OFFICERS = ALL_SCHEDULES.A_11_15.officers;
 
-    const HIREBACK_POOL = [
-      { name: 'AGUILERA, A', pe: 1997, shift: 'B', unit: 'D41' },
-      { name: 'SCHULIEN, S', pe: 1746, shift: 'B', unit: 'L354' },
-      { name: 'FAIRCHILD, C', pe: 1689, shift: 'C', unit: 'A196' },
-      { name: 'SANDERS, G', pe: 1860, shift: 'C', unit: 'K399' },
-      { name: 'LAMBIASE, B', pe: 2013, shift: 'C', unit: 'C171' },
-      { name: 'PATINO, R', pe: 1742, shift: 'B', unit: 'F244' }
-    ];
+    const DEFAULT_HIREBACK_OPT_IN_PES = [1689, 1742, 1746, 1860, 1997, 2013, 1586, 1732, 1844, 1924, 2021];
 
     let app = {
       selectedBureau: 'OPS',      // 'OPS' (Operations) | 'DB' (Detective Bureau)
@@ -10266,6 +10259,11 @@
       floatedMoves: [],
       auditEntries: [],
       toastData: null,
+      hireBackNoticeMode: 'SENIORITY_24HR', // 'SENIORITY_24HR' (>=24hr Notice: Most Senior Bidder Wins) | 'FCFS_UNDER_24HR' (<24hr Notice: First-Come, First-Served)
+      hireBackOptInPes: [...DEFAULT_HIREBACK_OPT_IN_PES],
+      hireBackBids: [],
+      hireBackBidCounter: 0,
+      hireBackLastWinnerNotification: null,
       savedHistory: {} // Keyed by `${selectedBureau}_${selectedDate}_${selectedShift}` for persistent historical reflection!
     };
 
@@ -10354,6 +10352,9 @@
         offTimeSheet: clone(app.offTimeSheet),
         dayOffRoster: clone(app.dayOffRoster),
         floatedMoves: clone(app.floatedMoves),
+        hireBackBids: clone(app.hireBackBids),
+        hireBackBidCounter: app.hireBackBidCounter,
+        hireBackLastWinnerNotification: clone(app.hireBackLastWinnerNotification),
         auditEntries: clone(app.auditEntries)
       };
     }
@@ -10423,6 +10424,9 @@
         app.offTimeSheet = clone(saved.offTimeSheet || tmpl.offTimeSheet || { dayOff: [], vacation: [], sickAndLeave: [], trainingAndSpecial: [] });
         app.dayOffRoster = clone(saved.dayOffRoster);
         app.floatedMoves = clone(saved.floatedMoves);
+        app.hireBackBids = clone(saved.hireBackBids || []);
+        app.hireBackBidCounter = saved.hireBackBidCounter || 0;
+        app.hireBackLastWinnerNotification = clone(saved.hireBackLastWinnerNotification || null);
         app.auditEntries = clone(saved.auditEntries);
       } else {
         app.shiftMin = tmpl.shiftMin;
@@ -10444,6 +10448,9 @@
         app.offTimeSheet = clone(tmpl.offTimeSheet || { dayOff: [], vacation: [], sickAndLeave: [], trainingAndSpecial: [] });
         app.dayOffRoster = { NW: [], NE: [], SW: [], SE: [] };
         app.floatedMoves = [];
+        app.hireBackBids = [];
+        app.hireBackBidCounter = 0;
+        app.hireBackLastWinnerNotification = null;
         const longDate = formatLongDate(app.selectedDate);
         const isPast = app.selectedDate < '2026-11-15';
         app.auditEntries = [
@@ -10930,12 +10937,161 @@
       positionPopoverNearEvent(event, 310, 268);
     }
 
-    // Searchable Cross-Shift Hire-Back Personnel Database Popover
+    // =========================================================================
+    // AUTOMATED HIRE-BACK NOTIFICATION, OPT-IN & BIDDING ENGINE (PBA Art. 35)
+    // =========================================================================
     let hireBackDbState = {
       shiftFilter: 'ALL', // 'A' | 'B' | 'C' | 'ALL'
       preferredDiv: null,
       preferredUnit: null
     };
+
+    function isOfficerOptedInForHireBack(pe) {
+      return app.hireBackOptInPes.includes(Number(pe));
+    }
+
+    function toggleOfficerHireBackOptIn(pe, officerName = '') {
+      const numPe = Number(pe);
+      const idx = app.hireBackOptInPes.indexOf(numPe);
+      let nowOptedIn = false;
+      if (idx >= 0) {
+        app.hireBackOptInPes.splice(idx, 1);
+        app.hireBackBids = app.hireBackBids.filter(b => b.pe !== numPe);
+      } else {
+        app.hireBackOptInPes.push(numPe);
+        nowOptedIn = true;
+      }
+      const dirEntry = MASTER_OPERATIONS_DIRECTORY.find(o => o.pe === numPe);
+      const displayName = officerName || dirEntry?.name || `Officer #${numPe}`;
+      app.auditEntries.unshift({
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        msg: `${displayName} (#${numPe}) ${nowOptedIn ? 'OPTED IN 🔔 to receive automated Hire-Back notifications' : 'OPTED OUT 🔕 of Hire-Back notifications'}.`,
+        tag: nowOptedIn ? 'Opted In 🔔' : 'Opted Out 🔕'
+      });
+      if (!document.getElementById('floatingActionMenu')?.classList.contains('hidden')) {
+        renderHireBackPopoverSections();
+      }
+      renderAll();
+    }
+
+    function setHireBackNoticeMode(mode) {
+      app.hireBackNoticeMode = mode; // 'SENIORITY_24HR' | 'FCFS_UNDER_24HR'
+      if (!document.getElementById('floatingActionMenu')?.classList.contains('hidden')) {
+        renderHireBackPopoverSections();
+      }
+      renderAll();
+    }
+
+    function ensureAutomatedHireBackBroadcast() {
+      const count = getShiftCount();
+      const min = app.shiftMin;
+      if (count >= min) return;
+
+      // Filter out any bidders who are already on duty on this shift
+      const onDutyPeSet = new Set();
+      for (const div of DIV_KEYS) {
+        for (const r of (app.officers[div] || [])) {
+          if (r.name && r.pe !== null) onDutyPeSet.add(r.pe);
+        }
+      }
+      app.hireBackBids = app.hireBackBids.filter(b => !onDutyPeSet.has(b.pe));
+
+      if (app.hireBackBids.length === 0) {
+        // Seed realistic incoming bids from opted-in cross-shift officers so Seniority vs First-Come-First-Served is immediately demonstrable
+        const seedCandidates = [
+          { pe: 1997, name: 'AGUILERA, A', shift: 'B', unit: 'D41', timestamp: '05:45:04' }, // 1st in time (wins <24hr FCFS)
+          { pe: 2013, name: 'LAMBIASE, B', shift: 'C', unit: 'C171', timestamp: '05:45:12' }, // 2nd in time
+          { pe: 1689, name: 'FAIRCHILD, C', shift: 'C', unit: 'A196', timestamp: '05:45:21' } // Most Senior / Lowest PE# (wins >=24hr Seniority)
+        ];
+        for (const sc of seedCandidates) {
+          if (!onDutyPeSet.has(sc.pe) && isOfficerOptedInForHireBack(sc.pe)) {
+            app.hireBackBidCounter += 1;
+            app.hireBackBids.push({
+              ...sc,
+              bidOrder: app.hireBackBidCounter
+            });
+          }
+        }
+      }
+    }
+
+    function getSortedHireBackBids() {
+      const onDutyPeSet = new Set();
+      for (const div of DIV_KEYS) {
+        for (const r of (app.officers[div] || [])) {
+          if (r.name && r.pe !== null) onDutyPeSet.add(r.pe);
+        }
+      }
+      const valid = app.hireBackBids.filter(b => !onDutyPeSet.has(b.pe));
+      if (app.hireBackNoticeMode === 'FCFS_UNDER_24HR') {
+        // Under 24-Hour Notice: First-Come, First-Served (earliest bidOrder wins)
+        return [...valid].sort((a, b) => a.bidOrder - b.bidOrder);
+      }
+      // >= 24-Hour Notice: Most Senior Bidder Wins (lowest PE # wins)
+      return [...valid].sort((a, b) => a.pe - b.pe);
+    }
+
+    function submitOfficerHireBackBid(pe, name, shift = 'B', unit = '', instantClaimIfUnder24Hr = false) {
+      const numPe = Number(pe);
+      if (!isOfficerOptedInForHireBack(numPe)) {
+        app.hireBackOptInPes.push(numPe);
+      }
+      const existing = app.hireBackBids.find(b => b.pe === numPe);
+      if (!existing) {
+        app.hireBackBidCounter += 1;
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        app.hireBackBids.push({
+          pe: numPe,
+          name,
+          shift,
+          unit,
+          timestamp: nowStr,
+          bidOrder: app.hireBackBidCounter
+        });
+        app.auditEntries.unshift({
+          time: nowStr,
+          msg: `Hire-Back Bid Received: [${shift}-Shift] ${name} (#${numPe}) submitted a bid for ${app.selectedShift}-Shift Hire-Back.`,
+          tag: 'Hire-Back Bid'
+        });
+      }
+
+      // If under 24 hours notice (First-Come, First-Served) and officer clicked Instant Claim, award immediately!
+      if (instantClaimIfUnder24Hr && app.hireBackNoticeMode === 'FCFS_UNDER_24HR') {
+        awardCrossShiftHireBack(
+          numPe,
+          name,
+          shift,
+          hireBackDbState.preferredDiv,
+          hireBackDbState.preferredUnit,
+          '< 24hr Notice • First-Come, First-Served Claim'
+        );
+        return;
+      }
+
+      if (!document.getElementById('floatingActionMenu')?.classList.contains('hidden')) {
+        renderHireBackPopoverSections();
+      }
+      renderAll();
+    }
+
+    function autoAwardWinningHireBackBid(preferredDiv = null, preferredUnit = null) {
+      ensureAutomatedHireBackBroadcast();
+      const sorted = getSortedHireBackBids();
+      if (sorted.length === 0) return;
+      const winner = sorted[0];
+      const ruleDesc = app.hireBackNoticeMode === 'FCFS_UNDER_24HR'
+        ? `< 24hr Short Notice • First-Come, First-Served Winner (Bid #1 at ${winner.timestamp})`
+        : `≥ 24hr Notice • Seniority Bid Winner (Most Senior Bidder PE #${winner.pe} of ${sorted.length} bids)`;
+
+      awardCrossShiftHireBack(
+        winner.pe,
+        winner.name,
+        winner.shift,
+        preferredDiv || hireBackDbState.preferredDiv,
+        preferredUnit || hireBackDbState.preferredUnit,
+        ruleDesc
+      );
+    }
 
     function openHireBackPopover(event, preferredDiv = null, preferredUnit = null) {
       if (event) event.stopPropagation();
@@ -10943,36 +11099,25 @@
       hireBackDbState.preferredUnit = preferredUnit;
       hireBackDbState.shiftFilter = 'ALL';
 
+      ensureAutomatedHireBackBroadcast();
+
       const content = document.getElementById('floatingMenuContent');
-      const count = getShiftCount();
-      const min = app.shiftMin;
-      const deficit = Math.max(0, min - count);
-
       content.innerHTML = `
-        <div class="px-2.5 py-2 border-b border-[var(--border-grid)] space-y-1.5">
-          <div class="flex items-center justify-between">
-            <span class="font-extrabold text-[var(--text-main)]">⚡ Hire-Back Officer Database</span>
-            <span class="px-1.5 py-0.2 rounded font-mono text-[10px] font-bold ${deficit > 0 ? 'bg-red-500/20 text-red-600 dark:text-red-300' : 'bg-emerald-500/15 text-emerald-600'}">
-              ${deficit > 0 ? `${deficit} Needed (${count}/${min})` : `Count ${count}/${min}`}
-            </span>
-          </div>
-          <div class="text-[10px] text-[var(--text-muted)]">
-            ${preferredUnit ? `Target Car: <strong>${preferredUnit} (${preferredDiv})</strong>` : 'Auto-assigns to open/floated car slot (PBA Art. 35 §4)'}
-          </div>
-
+        <div id="hireBackPopoverHeaderAndBids"></div>
+        <div class="px-2.5 py-1.5 border-b border-[var(--border-grid)] space-y-1.5">
           <!-- Search Input -->
-          <div class="relative pt-0.5">
+          <div class="relative">
             <input
               id="hireBackDbSearchInput"
               type="text"
-              placeholder="🔍 Search by Name, PE #, Shift, or Car..."
+              placeholder="🔍 Search Officer Database by Name, PE #, Shift..."
               oninput="renderHireBackDatabaseResults()"
               class="w-full bg-[var(--bg-subtle)] border border-[var(--border-strong)] rounded-lg px-2.5 py-1.5 text-[11px] text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-blue-500"
             />
           </div>
 
           <!-- Shift Filter Tabs (A | B | C | All) -->
-          <div class="flex items-center justify-between gap-1 pt-0.5">
+          <div class="flex items-center justify-between gap-1">
             <div class="flex items-center gap-1 text-[9.5px] font-bold">
               <button type="button" id="hbTab-A" onclick="setHireBackShiftFilter('A')" class="px-2 py-0.5 rounded cursor-pointer">A</button>
               <button type="button" id="hbTab-B" onclick="setHireBackShiftFilter('B')" class="px-2 py-0.5 rounded cursor-pointer">B</button>
@@ -10984,15 +11129,90 @@
         </div>
 
         <!-- Scrollable Database Results -->
-        <div id="hireBackDbResultsList" class="max-h-60 overflow-y-auto divide-y divide-[var(--border-grid)] px-1 py-1"></div>
+        <div id="hireBackDbResultsList" class="max-h-48 overflow-y-auto divide-y divide-[var(--border-grid)] px-1 py-1"></div>
       `;
 
-      positionPopoverNearEvent(event, 360, 336);
-      renderHireBackDatabaseResults();
+      positionPopoverNearEvent(event, 430, 360);
+      renderHireBackPopoverSections();
       setTimeout(() => {
         const inp = document.getElementById('hireBackDbSearchInput');
         if (inp) inp.focus();
       }, 20);
+    }
+
+    function renderHireBackPopoverSections() {
+      const topEl = document.getElementById('hireBackPopoverHeaderAndBids');
+      if (topEl) {
+        const count = getShiftCount();
+        const min = app.shiftMin;
+        const deficit = Math.max(0, min - count);
+        const sortedBids = getSortedHireBackBids();
+        const winner = sortedBids[0] || null;
+        const isSeniority = app.hireBackNoticeMode === 'SENIORITY_24HR';
+        const prefDivArg = hireBackDbState.preferredDiv ? `'${hireBackDbState.preferredDiv}'` : 'null';
+        const prefUnitArg = hireBackDbState.preferredUnit ? `'${hireBackDbState.preferredUnit}'` : 'null';
+
+        topEl.innerHTML = `
+          <div class="px-2.5 py-2 border-b border-[var(--border-grid)] space-y-1.5 bg-[var(--bg-subtle)] rounded-t-lg">
+            <div class="flex items-center justify-between">
+              <span class="font-extrabold text-[var(--text-main)]">⚡ Automated Hire-Back Engine</span>
+              <span class="px-1.5 py-0.2 rounded font-mono text-[10px] font-bold ${deficit > 0 ? 'bg-red-500/20 text-red-600 dark:text-red-300' : 'bg-emerald-500/15 text-emerald-600'}">
+                ${deficit > 0 ? `🔔 ${deficit} Open (${count}/${min})` : `Count ${count}/${min}`}
+              </span>
+            </div>
+
+            <!-- Notice Window Rule Toggle (>= 24hr Seniority vs < 24hr First-Come, First-Served) -->
+            <div class="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-strong)] text-[9.5px] font-bold">
+              <button type="button" onclick="setHireBackNoticeMode('SENIORITY_24HR')" class="py-1 px-1.5 rounded-md transition cursor-pointer ${isSeniority ? 'bg-blue-600 text-white shadow-2xs' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}">
+                ≥ 24hr Notice (Seniority)
+              </button>
+              <button type="button" onclick="setHireBackNoticeMode('FCFS_UNDER_24HR')" class="py-1 px-1.5 rounded-md transition cursor-pointer ${!isSeniority ? 'bg-amber-500 text-slate-950 shadow-2xs' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}">
+                &lt; 24hr (1st-Come, 1st-Served)
+              </button>
+            </div>
+
+            <div class="text-[10px] text-[var(--text-muted)] flex items-center justify-between">
+              <span>🔔 Notified: <strong>${app.hireBackOptInPes.length} Opted-In Officers</strong></span>
+              <span>${hireBackDbState.preferredUnit ? `Target: <strong>${hireBackDbState.preferredUnit}</strong>` : 'Auto-Slot'}</span>
+            </div>
+
+            ${sortedBids.length > 0 ? `
+              <div class="p-2 rounded-lg bg-slate-900 text-white space-y-1.5 border border-slate-700">
+                <div class="flex items-center justify-between text-[10px]">
+                  <span class="font-bold text-amber-300 uppercase tracking-wider">
+                    ${isSeniority ? '🏆 Bids Ranked by Seniority (PE#)' : '⚡ Bids Ranked 1st-Come, 1st-Served'}
+                  </span>
+                  <span class="font-mono text-slate-400">${sortedBids.length} bids</span>
+                </div>
+                <div class="space-y-1 max-h-24 overflow-y-auto">
+                  ${sortedBids.map((b, idx) => `
+                    <div class="flex items-center justify-between text-[10.5px] px-1.5 py-1 rounded ${idx === 0 ? 'bg-emerald-500/20 border border-emerald-500/40 font-bold text-emerald-200' : 'text-slate-300'}">
+                      <div class="truncate">
+                        <span>${idx === 0 ? '🏆 ' : `#${idx + 1} `}${b.name}</span>
+                        <span class="font-mono text-[10px] text-amber-300">(#${b.pe} • ${b.shift})</span>
+                      </div>
+                      <span class="font-mono text-[9.5px] text-slate-400 shrink-0">${b.timestamp}</span>
+                    </div>
+                  `).join('')}
+                </div>
+                <button
+                  type="button"
+                  onclick="closeActionPopover(); autoAwardWinningHireBackBid(${prefDivArg}, ${prefUnitArg})"
+                  class="w-full py-1.5 px-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[11px] flex items-center justify-between cursor-pointer shadow"
+                >
+                  <span>🏆 Award to ${winner.name} (#${winner.pe}) &amp; Schedule</span>
+                  <span>→</span>
+                </button>
+              </div>
+            ` : `
+              <div class="text-[10px] text-[var(--text-muted)] italic">
+                Click <strong>🙋 Bid</strong> on any opted-in officer below to add them to the bid pool.
+              </div>
+            `}
+          </div>
+        `;
+      }
+      renderHireBackDatabaseResults();
     }
 
     function setHireBackShiftFilter(filterCode) {
@@ -11061,25 +11281,44 @@
       listEl.innerHTML = filtered.map(o => {
         const safeName = o.name.replace(/'/g, "\\'");
         const unitLabel = o.unit && o.unit !== 'OFF' ? `${o.unit}${o.div ? ` (${o.div})` : ''}` : 'Off-Time';
+        const optedIn = isOfficerOptedInForHireBack(o.pe);
+        const hasBid = app.hireBackBids.some(b => b.pe === o.pe);
         return `
-          <div class="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-blue-500/10 rounded-lg transition">
+          <div class="flex items-center justify-between gap-1.5 px-2 py-1.5 hover:bg-blue-500/10 rounded-lg transition">
             <div class="min-w-0">
-              <div class="flex items-center gap-1.5">
+              <div class="flex items-center gap-1">
                 <span class="font-bold text-[var(--text-main)] truncate">${o.name}</span>
                 <span class="font-mono text-[10px] text-[var(--text-muted)] shrink-0">#${o.pe}</span>
               </div>
-              <div class="text-[10px] text-[var(--text-muted)] font-mono">
+              <div class="text-[10px] text-[var(--text-muted)] font-mono flex items-center gap-1">
                 <span class="px-1 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold">${o.shift}-Shift</span>
-                <span class="ml-1">${unitLabel}</span>
+                <span>${unitLabel}</span>
               </div>
             </div>
-            <button
-              type="button"
-              onclick="closeActionPopover(); awardCrossShiftHireBack(${o.pe}, '${safeName}', '${o.shift}', ${prefDivArg}, ${prefUnitArg})"
-              class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10.5px] cursor-pointer shrink-0 shadow-2xs"
-            >
-              + Assign
-            </button>
+            <div class="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onclick="toggleOfficerHireBackOptIn(${o.pe}, '${safeName}')"
+                title="${optedIn ? 'Opted In for Hire-Back Alerts (Click to Opt Out)' : 'Opted Out (Click to Opt In)'}"
+                class="px-1.5 py-1 rounded text-[9.5px] font-bold cursor-pointer ${optedIn ? 'bg-blue-500/15 text-blue-600 dark:text-blue-300 border border-blue-500/30' : 'bg-slate-500/10 text-[var(--text-muted)]'}"
+              >
+                ${optedIn ? '🔔 Opt-In' : '🔕 Off'}
+              </button>
+              <button
+                type="button"
+                onclick="submitOfficerHireBackBid(${o.pe}, '${safeName}', '${o.shift}', '${o.unit || ''}', false)"
+                class="px-2 py-1 rounded text-[10px] font-bold cursor-pointer ${hasBid ? 'bg-amber-400 text-slate-950' : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300'}"
+              >
+                ${hasBid ? '✓ Bid In' : '🙋 Bid'}
+              </button>
+              <button
+                type="button"
+                onclick="closeActionPopover(); awardCrossShiftHireBack(${o.pe}, '${safeName}', '${o.shift}', ${prefDivArg}, ${prefUnitArg})"
+                class="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] cursor-pointer"
+              >
+                + Assign
+              </button>
+            </div>
           </div>
         `;
       }).join('');
@@ -11252,6 +11491,9 @@
       if (meta && meta.rawStr && meta.colKey) {
         app.offTimeSheet[meta.colKey].unshift(meta.rawStr);
       }
+      if (app.hireBackLastWinnerNotification && app.hireBackLastWinnerNotification.pe === pe) {
+        app.hireBackLastWinnerNotification = null;
+      }
 
       app.auditEntries.unshift({
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -11264,7 +11506,7 @@
       recalculateFloats();
     }
 
-    function awardCrossShiftHireBack(pe, name, fromShift = 'B', preferredDiv = null, preferredUnit = null) {
+    function awardCrossShiftHireBack(pe, name, fromShift = 'B', preferredDiv = null, preferredUnit = null, customRuleNote = null) {
       // Check if this officer is already on duty on the current worksheet
       const existing = findOfficerByPe(pe);
       if (existing && existing.state === 'ON_DUTY') return;
@@ -11290,18 +11532,44 @@
       recalculateFloats();
       const countAfter = getShiftCount();
 
+      const ruleLabel = customRuleNote || (
+        app.hireBackNoticeMode === 'FCFS_UNDER_24HR'
+          ? '< 24hr Notice • First-Come, First-Served Winner'
+          : `≥ 24hr Notice • Seniority Bid Winner (PE #${pe})`
+      );
+      const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      // Remove winner from active bid pool (or clear pool if shift is back at minimum)
+      app.hireBackBids = app.hireBackBids.filter(b => b.pe !== pe);
+      if (countAfter >= app.shiftMin) {
+        app.hireBackBids = [];
+      }
+
+      // Notify the winning officer on the Mobile App and switch mobile preview to them so user sees the notification!
+      app.hireBackLastWinnerNotification = {
+        pe,
+        name,
+        shift: fromShift,
+        assignedUnit: slot.row.unit,
+        assignedDiv: slot.div,
+        ruleLabel,
+        timestamp: nowStr
+      };
+      app.loggedInPe = pe;
+      populateUserSelect();
+
       app.toastData = {
         status: 'approved',
-        title: `Hire-Back Filled: [${fromShift}-Shift] ${name} (#${pe}) Assigned to ${slot.row.unit} (${slot.div})`,
-        step1: `Step 1 (Cross-Shift Call-In): ${name} (#${pe}) from ${fromShift}-Shift accepted the Hire-Back (PBA Art. 35 / FOPLC Art. 24).`,
-        step2: `Step 2 (Unit Assignment): Placed into Unit ${slot.row.unit} (${slot.div} Division).`,
+        title: `🏆 Automated Hire-Back Awarded: [${fromShift}-Shift] ${name} (#${pe}) Notified & Placed in ${slot.row.unit} (${slot.div})`,
+        step1: `Step 1 (Award Rule): ${ruleLabel}.`,
+        step2: `Step 2 (Officer Notification & Placement): Push notification sent to ${name} (#${pe}) and placed in Unit ${slot.row.unit} (${slot.div} Division).`,
         step3: `Step 3 (Shift Count Restored): Shift Count ${countBefore} → ${countAfter} (Minimum ${app.shiftMin}).`
       };
 
       app.auditEntries.unshift({
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        msg: `Cross-Shift Hire-Back Awarded (Art. 35): [${fromShift}-Shift] ${name} (#${pe}) assigned to ${slot.row.unit} (${slot.div}). Shift Count: ${countBefore} → ${countAfter}.`,
-        tag: 'Art. 35 §4–5'
+        time: nowStr,
+        msg: `Automated Hire-Back Awarded (${ruleLabel}): [${fromShift}-Shift] ${name} (#${pe}) notified & placed into ${slot.row.unit} (${slot.div}). Shift Count: ${countBefore} → ${countAfter}.`,
+        tag: 'Art. 35 Hire-Back'
       });
 
       renderAll();
@@ -11415,12 +11683,22 @@
       const countAfter = getShiftCount();
       const relevantFloat = app.floatedMoves.find(m => m.toUnit === homeSlotUnit) || app.floatedMoves[app.floatedMoves.length - 1];
 
+      // Automatically trigger Hire-Back Notification Broadcast to all Opted-In Officers if shift dropped below minimum
+      if (countAfter < app.shiftMin) {
+        ensureAutomatedHireBackBroadcast();
+        app.auditEntries.unshift({
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          msg: `🔔 Automated Hire-Back Alert broadcast to ${app.hireBackOptInPes.length} Opted-In Officers (${app.selectedShift}-Shift Count ${countAfter}/${app.shiftMin}). ${app.hireBackBids.length} officers submitted bids.`,
+          tag: 'Art. 35 Broadcast'
+        });
+      }
+
       const floatExplanation = relevantFloat
         ? `Step 3 (Auto-Float): District ${relevantFloat.district} (${relevantFloat.toUnit}) dropped to 0 units → ${relevantFloat.name} (#${relevantFloat.pe}) automatically floated from ${relevantFloat.fromUnit} (${relevantFloat.fromDiv}) into ${relevantFloat.toUnit} (${relevantFloat.toDiv}).`
         : `Step 3 (District Check): District still covered; no float required.`;
 
       const countExplanation = countAfter < app.shiftMin
-        ? `Step 1 (Count Check): Approved (${leaveConfig.article}). Shift Count ${countBefore} → ${countAfter} (below Min ${app.shiftMin} → Click "⚡ Cross-Shift Hire-Back ▾" to fill!).`
+        ? `Step 1 (Count & Broadcast): Shift Count ${countBefore} → ${countAfter} (Below Min ${app.shiftMin}). Automated Hire-Back Alert sent to ${app.hireBackOptInPes.length} Opted-In Officers!`
         : `Step 1 (Count Check): Approved! Shift Count ${countBefore} → ${countAfter} (meets Minimum ${app.shiftMin}).`;
 
       app.toastData = {
@@ -11659,6 +11937,42 @@
           </div>
         `;
       } else {
+        const count = getShiftCount();
+        const min = app.shiftMin;
+        let autoHireBackBar = '';
+        if (count < min) {
+          ensureAutomatedHireBackBroadcast();
+          const sortedBids = getSortedHireBackBids();
+          const winner = sortedBids[0];
+          const isSeniority = app.hireBackNoticeMode === 'SENIORITY_24HR';
+          if (winner) {
+            autoHireBackBar = `
+              <div class="mt-2 pt-2 border-t border-slate-700/80 flex flex-wrap items-center justify-between gap-2">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30 font-bold text-[10.5px]">
+                    🔔 ${app.hireBackOptInPes.length} Opted-In Notified • ${sortedBids.length} Bids In
+                  </span>
+                  <div class="inline-flex items-center bg-slate-800 p-0.5 rounded-lg border border-slate-700 text-[10px] font-bold">
+                    <button onclick="setHireBackNoticeMode('SENIORITY_24HR')" class="px-2 py-0.5 rounded cursor-pointer ${isSeniority ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}">
+                      ≥ 24hr Notice (Seniority)
+                    </button>
+                    <button onclick="setHireBackNoticeMode('FCFS_UNDER_24HR')" class="px-2 py-0.5 rounded cursor-pointer ${!isSeniority ? 'bg-amber-400 text-slate-950' : 'text-slate-400 hover:text-white'}">
+                      &lt; 24hr Notice (1st-Come)
+                    </button>
+                  </div>
+                  <span class="text-slate-300 text-[11px]">
+                    Winning Bidder: <strong class="text-emerald-300">${winner.name} (#${winner.pe} • ${winner.shift}-Shift)</strong>
+                    <span class="text-slate-400 font-mono text-[10px]">(${isSeniority ? 'Most Senior PE#' : `1st Bid @ ${winner.timestamp}`})</span>
+                  </span>
+                </div>
+                <button onclick="autoAwardWinningHireBackBid()" class="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow cursor-pointer shrink-0">
+                  🏆 Award to ${winner.name} (#${winner.pe}) &amp; Place on Schedule
+                </button>
+              </div>
+            `;
+          }
+        }
+
         el.className = 'rounded-2xl p-4 border bg-slate-900 border-emerald-500/50 text-white text-xs space-y-1.5 shadow-lg';
         el.innerHTML = `
           <div class="flex items-center justify-between">
@@ -11673,6 +11987,7 @@
             ${app.toastData.step2 ? `<div class="p-2 rounded-lg bg-slate-800/90 border border-slate-700 text-slate-200">${app.toastData.step2}</div>` : ''}
             ${app.toastData.step3 ? `<div class="p-2 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-200 font-medium">${app.toastData.step3}</div>` : ''}
           </div>
+          ${autoHireBackBar}
         `;
       }
     }
@@ -11943,13 +12258,23 @@
 
       const canSpotLeave = count > min;
       const neededHireBacks = Math.max(0, min - count);
+      const isOptedIn = isOfficerOptedInForHireBack(targetPe);
+      const isSeniority = app.hireBackNoticeMode === 'SENIORITY_24HR';
+      const officerName = loc.row?.name || loc.item?.name || `Officer #${targetPe}`;
+      const safeOfficerName = officerName.replace(/'/g, "\\'");
+      const officerShift = loc.item?.shift || app.selectedShift;
 
-      // Minimalist 3-pill quick-switcher at top of mobile screen so user can test On-Duty, Vacation Return (Engelman #1586), or Cross-Shift Hire-Back (Aguilera #1997) in 1 tap
+      // Minimalist 3-pill quick-switcher + Opt-In toggle bar at top of mobile screen
       const roleSwitcherBar = `
         <div class="p-1.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
           <div class="flex items-center justify-between px-1">
-            <span class="text-[9.5px] uppercase tracking-wider text-slate-400 font-bold">Switch Mobile Officer View</span>
-            <span class="text-[9.5px] font-mono text-blue-400">PE #${targetPe}</span>
+            <span class="text-[9.5px] uppercase tracking-wider text-slate-400 font-bold">Switch Mobile View</span>
+            <button
+              onclick="toggleOfficerHireBackOptIn(${targetPe}, '${safeOfficerName}')"
+              class="px-1.5 py-0.5 rounded text-[9.5px] font-bold cursor-pointer transition ${isOptedIn ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40' : 'bg-slate-800 text-slate-400 border border-slate-700'}"
+            >
+              ${isOptedIn ? '🔔 Hire-Back Alerts: OPTED IN' : '🔕 Alerts: OPTED OUT'}
+            </button>
           </div>
           <div class="grid grid-cols-3 gap-1 text-[10px]">
             <button onclick="switchUserRole('1883')" class="px-1.5 py-1 rounded-lg font-bold truncate cursor-pointer transition ${targetPe === 1883 ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
@@ -11959,30 +12284,94 @@
               🏖️ Engelman #1586
             </button>
             <button onclick="switchUserRole('1997')" class="px-1.5 py-1 rounded-lg font-bold truncate cursor-pointer transition ${targetPe === 1997 ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
-              ⚡ Aguilera B-Shift
+              ⚡ Aguilera #1997
             </button>
           </div>
         </div>
       `;
 
-      // Compact Open Hire-Back Broadcast banner when shift is below minimum
-      const hireBackBroadcastBanner = neededHireBacks > 0
+      // Winner Push Notification Banner (Displayed when this officer just won a Hire-Back!)
+      const winNotif = app.hireBackLastWinnerNotification;
+      const winnerPushBanner = (winNotif && winNotif.pe === targetPe)
         ? `
-          <div class="p-2.5 rounded-xl bg-red-950/80 border border-red-500/40 space-y-1.5">
+          <div class="p-3 rounded-2xl bg-emerald-950/90 border border-emerald-400/60 space-y-1.5 shadow-lg">
             <div class="flex items-center justify-between">
-              <span class="text-[10px] font-extrabold uppercase tracking-wider text-red-300 flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-red-400 animate-ping"></span>
-                Open Hire-Back Broadcast (${count}/${min})
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                🏆 Hire-Back Won &amp; Scheduled!
               </span>
-              <span class="text-[9.5px] font-mono text-amber-300">Art. 35 §4</span>
+              <button onclick="app.hireBackLastWinnerNotification=null; renderAll();" class="text-slate-400 hover:text-white text-xs font-bold">✕</button>
             </div>
-            <button onclick="openHireBackPopover(event)" class="w-full py-1.5 px-2.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[10.5px] flex items-center justify-between cursor-pointer">
-              <span>🔍 Search Officer Database to Fill Hire-Back</span>
-              <span>▾</span>
-            </button>
+            <div class="text-xs font-bold text-white">
+              You have been placed in <span class="text-amber-300 font-mono">Unit ${winNotif.assignedUnit} (${winNotif.assignedDiv})</span>
+            </div>
+            <div class="text-[10px] text-emerald-200 leading-snug">
+              ${winNotif.ruleLabel}
+            </div>
           </div>
         `
         : '';
+
+      // Automated Hire-Back Broadcast & Bidding Card (Shown when shift is below minimum)
+      let hireBackBroadcastBanner = '';
+      if (neededHireBacks > 0) {
+        ensureAutomatedHireBackBroadcast();
+        const sortedBids = getSortedHireBackBids();
+        const winner = sortedBids[0];
+        const myBid = app.hireBackBids.find(b => b.pe === targetPe);
+        const canThisOfficerBid = loc.state !== 'ON_DUTY';
+
+        hireBackBroadcastBanner = `
+          <div class="p-2.5 rounded-2xl bg-red-950/85 border border-red-500/40 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-red-300 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-red-400 animate-ping"></span>
+                🔔 Hire-Back Alert (${count}/${min})
+              </span>
+              <span class="text-[9.5px] font-mono text-amber-300">${app.hireBackOptInPes.length} Opted-In Notified</span>
+            </div>
+
+            <!-- Notice Window Toggle on Mobile -->
+            <div class="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-slate-900 border border-slate-800 text-[9.5px] font-bold">
+              <button onclick="setHireBackNoticeMode('SENIORITY_24HR')" class="py-1 rounded cursor-pointer ${isSeniority ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}">
+                ≥ 24hr (Seniority)
+              </button>
+              <button onclick="setHireBackNoticeMode('FCFS_UNDER_24HR')" class="py-1 rounded cursor-pointer ${!isSeniority ? 'bg-amber-400 text-slate-950' : 'text-slate-400 hover:text-white'}">
+                &lt; 24hr (1st-Come)
+              </button>
+            </div>
+
+            ${sortedBids.length > 0 ? `
+              <div class="p-2 rounded-xl bg-slate-900/95 border border-slate-800 space-y-1">
+                <div class="flex items-center justify-between text-[9.5px] text-slate-400">
+                  <span>${isSeniority ? 'Ranked by Seniority (Lowest PE#)' : 'Ranked 1st-Come, 1st-Served'}</span>
+                  <span class="font-mono">${sortedBids.length} Bids</span>
+                </div>
+                ${sortedBids.slice(0, 3).map((b, idx) => `
+                  <div class="flex items-center justify-between text-[10px] px-1.5 py-0.5 rounded ${idx === 0 ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'text-slate-300'}">
+                    <span>${idx === 0 ? '🏆 ' : `#${idx + 1} `}${b.name} (#${b.pe} • ${b.shift})</span>
+                    <span class="font-mono text-[9px] text-slate-400">${b.timestamp}</span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+
+            <div class="flex flex-col gap-1">
+              ${canThisOfficerBid && !myBid ? `
+                <button onclick="submitOfficerHireBackBid(${targetPe}, '${safeOfficerName}', '${officerShift}', '', ${!isSeniority})" class="w-full py-1.5 px-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-[10.5px] cursor-pointer">
+                  ${isSeniority ? `🙋 Bid Hire-Back as ${officerName} (#${targetPe})` : `⚡ Claim Instantly (1st-Come) as ${officerName}`}
+                </button>
+              ` : ''}
+              ${winner ? `
+                <button onclick="autoAwardWinningHireBackBid()" class="w-full py-1.5 px-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[10.5px] flex items-center justify-between cursor-pointer shadow">
+                  <span>🏆 Auto-Award Winner: ${winner.name} (#${winner.pe})</span>
+                  <span>→</span>
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }
 
       if (loc.state === 'ON_DUTY') {
         const r = loc.row;
@@ -11998,6 +12387,7 @@
 
         container.innerHTML = `
           ${roleSwitcherBar}
+          ${winnerPushBanner}
           ${hireBackBroadcastBanner}
 
           <!-- Officer Identity Card -->
@@ -12086,6 +12476,7 @@
         const item = loc.item;
         container.innerHTML = `
           ${roleSwitcherBar}
+          ${winnerPushBanner}
           ${hireBackBroadcastBanner}
 
           <div class="p-3.5 rounded-2xl bg-blue-950/60 border border-blue-500/40 space-y-2.5">
@@ -12122,40 +12513,37 @@
       } else if (loc.state === 'OTHER_SHIFT') {
         // Cross-shift officer (e.g., B-Shift Aguilera #1997 viewing A-Shift Hire-Backs)
         const item = loc.item;
+        const safeItemName = item.name.replace(/'/g, "\\'");
+        const myBid = app.hireBackBids.find(b => b.pe === item.pe);
         container.innerHTML = `
           ${roleSwitcherBar}
+          ${winnerPushBanner}
+          ${hireBackBroadcastBanner}
 
           <div class="p-3.5 rounded-2xl bg-amber-950/50 border border-amber-500/40 space-y-2.5">
             <div class="flex items-center justify-between">
               <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-[10px]">
-                ⚡ ${item.shift}-SHIFT OFFICER (CROSS-SHIFT VIEW)
+                ⚡ ${item.shift}-SHIFT OFFICER (${isOptedIn ? 'OPTED IN 🔔' : 'OPTED OUT 🔕'})
               </span>
               <span class="font-mono text-[11px] text-slate-400">PE #${item.pe}</span>
             </div>
             <div>
               <div class="text-base font-extrabold text-white">${item.name}</div>
               <div class="text-xs text-amber-300 font-semibold mt-0.5">
-                Viewing ${app.selectedShift}-Shift Staffing: Count ${count} / Min ${min}
+                ${app.selectedShift}-Shift Staffing: Count ${count} / Min ${min}
               </div>
             </div>
             <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300">
-              ${neededHireBacks > 0
-                ? `<span class="text-red-300 font-bold">🚨 ${neededHireBacks} Open Hire-Back Needed!</span> Claim this overtime slot per Art. 35 §4 to restore ${app.selectedShift}-Shift to minimum count.`
-                : `${app.selectedShift}-Shift is currently at ${count}/${min}. You can still volunteer for a Cross-Shift Hire-Back slot below:`}
+              ${myBid
+                ? `✓ Your bid is in the queue (Submitted at <strong>${myBid.timestamp}</strong>). ${isSeniority ? 'Awarded by Seniority (Lowest PE#) when ≥ 24hr notice.' : 'Awarded First-Come, First-Served when < 24hr notice.'}`
+                : `You are ${isOptedIn ? 'opted in to receive' : 'currently opted out of'} automated Hire-Back notifications for ${app.selectedShift}-Shift.`}
             </div>
           </div>
 
           <div class="space-y-2 pt-1">
-            <button onclick="awardCrossShiftHireBack(${item.pe}, '${item.name}', '${item.shift}', null, null)" class="w-full p-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-center shadow-lg transition cursor-pointer">
-              ⚡ Claim &amp; Work ${app.selectedShift}-Shift Hire-Back (1.5x OT)
+            <button onclick="submitOfficerHireBackBid(${item.pe}, '${safeItemName}', '${item.shift}', '${item.unit || ''}', ${!isSeniority})" class="w-full p-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-center shadow-lg transition cursor-pointer">
+              ${!isSeniority ? `⚡ Claim ${app.selectedShift}-Shift Hire-Back Instantly (1st-Come)` : myBid ? `✓ Bid Submitted — Tap Above to Award Winner` : `🙋 Submit Bid for ${app.selectedShift}-Shift Hire-Back`}
             </button>
-            <div class="grid grid-cols-4 gap-1">
-              ${DIV_KEYS.map(d => `
-                <button onclick="awardCrossShiftHireBack(${item.pe}, '${item.name}', '${item.shift}', '${d}', null)" class="py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-300 font-bold text-[10px] cursor-pointer">
-                  + ${d} Car
-                </button>
-              `).join('')}
-            </div>
           </div>
         `;
       } else {
@@ -12165,6 +12553,7 @@
 
         container.innerHTML = `
           ${roleSwitcherBar}
+          ${winnerPushBanner}
           ${hireBackBroadcastBanner}
 
           <div class="p-3.5 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 space-y-2.5">
@@ -12258,13 +12647,35 @@
       const hbBox = document.getElementById('hireBackActionBox');
       if (count < min) {
         const needed = min - count;
+        ensureAutomatedHireBackBroadcast();
+        const sortedBids = getSortedHireBackBids();
+        const winner = sortedBids[0];
+        const isSeniority = app.hireBackNoticeMode === 'SENIORITY_24HR';
+
         hbBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-600 dark:text-red-300';
-        hbBadge.textContent = `${needed} Hire-Back Needed`;
+        hbBadge.textContent = `🔔 ${needed} Hire-Back Open (${sortedBids.length} Bids)`;
         hbBox.innerHTML = `
-          <div class="p-2 rounded-lg bg-red-500/10 border border-red-500/30 text-xs space-y-1.5 mt-1">
-            <div class="font-bold text-red-600 dark:text-red-300 text-[11px]">Shift Below Minimum (Art. 35 §4):</div>
-            <button onclick="openHireBackPopover(event)" class="w-full px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center justify-between cursor-pointer">
-              <span>🔍 Search Officer Database to Fill Hire-Back</span>
+          <div class="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-xs space-y-1.5 mt-1">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-red-600 dark:text-red-300 text-[11px]">Automated Hire-Back Bid Engine:</span>
+              <span class="text-[10px] font-mono text-[var(--text-muted)]">${app.hireBackOptInPes.length} Opted-In</span>
+            </div>
+            <div class="grid grid-cols-2 gap-1 text-[10px] font-bold">
+              <button onclick="setHireBackNoticeMode('SENIORITY_24HR')" class="py-1 rounded cursor-pointer ${isSeniority ? 'bg-blue-600 text-white' : 'bg-[var(--bg-surface)] text-[var(--text-muted)] border border-[var(--border-grid)]'}">
+                ≥ 24hr (Seniority)
+              </button>
+              <button onclick="setHireBackNoticeMode('FCFS_UNDER_24HR')" class="py-1 rounded cursor-pointer ${!isSeniority ? 'bg-amber-400 text-slate-950' : 'bg-[var(--bg-surface)] text-[var(--text-muted)] border border-[var(--border-grid)]'}">
+                &lt; 24hr (1st-Come)
+              </button>
+            </div>
+            ${winner ? `
+              <button onclick="autoAwardWinningHireBackBid()" class="w-full px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center justify-between cursor-pointer shadow-xs">
+                <span>🏆 Award Winner: ${winner.name} (#${winner.pe})</span>
+                <span>→</span>
+              </button>
+            ` : ''}
+            <button onclick="openHireBackPopover(event)" class="w-full px-2.5 py-1 rounded-lg bg-[var(--bg-surface)] hover:bg-blue-500/10 border border-[var(--border-strong)] text-[var(--text-main)] font-semibold text-[10.5px] flex items-center justify-between cursor-pointer">
+              <span>🔍 View All Bids &amp; Opt-In Database</span>
               <span>▾</span>
             </button>
           </div>
