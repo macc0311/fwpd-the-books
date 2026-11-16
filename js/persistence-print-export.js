@@ -710,7 +710,7 @@
       };
     }
 
-    // Wrap restoreOfficerFromDayOff so step2 dynamically reports the actual floated officer instead of hardcoded Sikorski
+    // Wrap restoreOfficerFromDayOff so step2 dynamically reports the actual floated officer unless a Hire-Back cancellation toast is active
     const origRestore = window.restoreOfficerFromDayOff;
     if (typeof origRestore === 'function') {
       window.restoreOfficerFromDayOff = function (div, homeUnit) {
@@ -718,15 +718,13 @@
           ? app.floatedMoves.find(m => m.toUnit === homeUnit && m.toDiv === div)
           : null;
         origRestore.apply(this, arguments);
-        if (app.toastData && app.toastData.status === 'approved') {
+        if (app.toastData && app.toastData.status === 'approved' && !String(app.toastData.title || '').includes('Canceled')) {
           app.toastData.step2 = priorMove
             ? `Step 2: Floated coverage officer (${priorMove.name} #${priorMove.pe}) automatically returned to home car ${priorMove.fromUnit} (${priorMove.fromDiv}).`
             : 'Step 2: All district assignments verified and restored.';
-          if (typeof origRenderAll === 'function') {
-            origRenderAll.apply(this, []);
-            updatePrintFooter();
-            saveStateToStorage();
-          }
+        }
+        if (typeof window.renderAll === 'function') {
+          window.renderAll();
         }
       };
     }

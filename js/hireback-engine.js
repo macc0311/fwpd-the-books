@@ -488,7 +488,12 @@
       return posting;
     }
 
-    if (eng.autoSimulateBids && !isShiftStartedBlocked) {
+    if (awardRule === 'FCFS' && posting.category === 'OFFICER' && Array.isArray(app.hireBackBids)) {
+      // Under 24h First-Come, First-Served starts with 0 bids so the first officer to bid wins immediately (or if no one bids and someone returns to shift, it cancels)
+      app.hireBackBids = [];
+    }
+
+    if (eng.autoSimulateBids && !isShiftStartedBlocked && awardRule === 'SENIORITY') {
       scheduleSimulatedBidsForPosting(posting);
     }
 
@@ -498,6 +503,8 @@
 
   function syncAppHireBackBidsIntoPosting(posting) {
     if (!posting || posting.category !== 'OFFICER' || !Array.isArray(app.hireBackBids)) return;
+    // In <24h FCFS mode, do not auto-seed simulated bids from ensureAutomatedHireBackBroadcast unless an officer explicitly bids
+    if (posting.awardRule === 'FCFS') return;
     for (const lb of app.hireBackBids) {
       if (!lb || !lb.pe) continue;
       if (!posting.bids.some(b => b.pe === lb.pe)) {
@@ -510,7 +517,7 @@
           shift: lb.shift || 'B',
           badgeLabel: lb.shift ? `Uniform (${lb.shift}-Shift)` : 'Uniform',
           seq: lb.bidOrder || posting.bidSeqCounter++,
-          bidTime: lb.bidTime || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          bidTime: lb.bidTime || lb.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
           source: 'Opt-In Bid Queue'
         });
       }
@@ -518,6 +525,7 @@
   }
 
   function scheduleSimulatedBidsForPosting(posting) {
+    if (posting.awardRule === 'FCFS') return;
     if (posting.category === 'OFFICER') {
       syncAppHireBackBidsIntoPosting(posting);
     }
@@ -548,7 +556,7 @@
     if (picked[1] && posting.awardRule === 'SENIORITY') {
       setTimeout(() => {
         const eng = ensureEngineState();
-        if (eng && eng.openPostings.some(p => p.id === posting.id && p.status === 'OPEN')) {
+        if (eng && eng.openPostings.some(p => p.id === posting.id && p.status === 'OPEN' && p.awardRule === 'SENIORITY')) {
           submitBidToPosting(posting.id, picked[1], 'MyShift Mobile App');
           if (typeof window.renderAll === 'function') window.renderAll();
         }
@@ -557,7 +565,7 @@
     if (picked[2] && posting.awardRule === 'SENIORITY') {
       setTimeout(() => {
         const eng = ensureEngineState();
-        if (eng && eng.openPostings.some(p => p.id === posting.id && p.status === 'OPEN')) {
+        if (eng && eng.openPostings.some(p => p.id === posting.id && p.status === 'OPEN' && p.awardRule === 'SENIORITY')) {
           submitBidToPosting(posting.id, picked[2], 'MyShift Mobile App');
           if (typeof window.renderAll === 'function') window.renderAll();
         }
@@ -823,8 +831,149 @@
   }
 
   // ===========================================================================
-  // 8. AUTOMATIC SHORTAGE DETECTION (PATROL & SUPERVISORS)
+  // 8. AUTOMATIC SHORTAGE DETECTION & UN-AWARDED CANCELLATION ENGINE
   // ===========================================================================
+  function buildOptedInCancellationRecipients(posting) {
+    const seenPes = new Set();
+    const recipients = [];
+    const canceledTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    // 1. Include all active bidders on this posting first (so they know their pending bid was voided)
+    for (const b of (posting.bids || [])) {
+      if (!b || !b.pe || seenPes.has(b.pe)) continue;
+      seenPes.add(b.pe);
+      recipients.push({
+        name: b.name,
+        pe: b.pe,
+        badgeLabel: b.badgeLabel || (b.shift ? `${b.shift}-Shift` : 'Uniform'),
+        bidTime: b.bidTime || canceledTime,
+        hadActiveBid: true,
+        outcome: '🚫 CANCELED • BID VOIDED (SHIFT AT MIN)',
+        detail: `🚫 Hire-Back ${posting.id} for Unit ${posting.targetUnit} (${posting.targetDiv}) was CANCELED prior to award because the shift returned to minimum count. Your pending bid has been voided.`
+      });
+    }
+
+    // 2. Include all Opted-In Officers (app.hireBackOptInPes) who received the Hire-Back broadcast
+    if (posting.category === 'SUPERVISOR') {
+      const supPool = EXTENDED_CANDIDATE_POOL.filter(c => c.role === 'LT' || c.role === 'SGT');
+      for (const s of supPool) {
+        if (seenPes.has(s.pe)) continue;
+        seenPes.add(s.pe);
+        recipients.push({
+          name: s.name,
+          pe: s.pe,
+          badgeLabel: s.badgeLabel,
+          bidTime: canceledTime,
+          hadActiveBid: false,
+          outcome: '🚫 CANCELED • OPT-IN ALERT SENT',
+          detail: `🚫 Supervisor Hire-Back ${posting.id} (${posting.targetUnit} ${posting.targetDiv}) was CANCELED prior to award — Command minimums restored.`
+        });
+      }
+    } else {
+      const optInPes = Array.isArray(app.hireBackOptInPes) && app.hireBackOptInPes.length > 0
+        ? app.hireBackOptInPes
+        : [1997, 2013, 1689, 1742, 1812, 1860, 1977];
+      const masterDir = (typeof MASTER_OPERATIONS_DIRECTORY !== 'undefined' && Array.isArray(MASTER_OPERATIONS_DIRECTORY))
+        ? MASTER_OPERATIONS_DIRECTORY
+        : [];
+
+      for (const pe of optInPes) {
+        const numPe = Number(pe);
+        if (!numPe || seenPes.has(numPe)) continue;
+        // Skip officers currently working on the active shift unless they were opted in from another shift
+        if (isMemberAlreadyWorkingCurrentShift(numPe)) continue;
+        seenPes.add(numPe);
+
+        const dirMatch = masterDir.find(o => o.pe === numPe)
+          || EXTENDED_CANDIDATE_POOL.find(c => c.pe === numPe);
+        const offName = dirMatch ? dirMatch.name : `OFFICER #${numPe}`;
+        const offShift = (dirMatch && dirMatch.shift) ? `${dirMatch.shift}-Shift` : 'Opted-In';
+
+        recipients.push({
+          name: offName,
+          pe: numPe,
+          badgeLabel: `${offShift} (Opted-In 🔔)`,
+          bidTime: canceledTime,
+          hadActiveBid: false,
+          outcome: '🚫 CANCELED • OPT-IN ALERT SENT',
+          detail: `🚫 Hire-Back ${posting.id} for Unit ${posting.targetUnit} (${posting.targetDiv}) was CANCELED prior to award — Shift returned to minimum count.`
+        });
+      }
+    }
+
+    return recipients;
+  }
+
+  function cancelUnAwardedPostings(postingsToCancel, cancelContext) {
+    const eng = ensureEngineState();
+    if (!eng || !Array.isArray(postingsToCancel) || postingsToCancel.length === 0) return;
+
+    const count = getShiftCount();
+    const min = app.shiftMin;
+    const canceledTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const returnReason = (cancelContext && cancelContext.reason)
+      ? cancelContext.reason
+      : `An officer returned to ${app.selectedShift}-Shift, placing Shift Count at ${count}/${min} (Minimum ${min})`;
+
+    for (const posting of postingsToCancel) {
+      eng.openPostings = eng.openPostings.filter(p => p.id !== posting.id);
+
+      const recipients = buildOptedInCancellationRecipients(posting);
+      const hadBidsCount = (posting.bids || []).length;
+      const modeDesc = posting.awardRule === 'FCFS'
+        ? `< 24h Short-Notice FCFS (${hadBidsCount === 0 ? '0 bids placed yet' : `${hadBidsCount} bid(s)`})`
+        : `≥ 24h Seniority Bid Window (not awarded yet • ${hadBidsCount} pending bid(s) voided)`;
+
+      const whyCanceled = `Un-awarded Hire-Back [${modeDesc}] CANCELED automatically: ${returnReason}. Shift Count is now ${count}/${min}.`;
+
+      const cancelRecord = {
+        recordType: 'CANCELED',
+        id: posting.id,
+        closedAt: canceledTime,
+        category: posting.category,
+        awardRule: posting.awardRule,
+        blockType: posting.blockType,
+        durationHrs: posting.durationHrs,
+        unit: posting.targetUnit,
+        div: posting.targetDiv,
+        winnerName: 'CANCELED (SHIFT AT MIN)',
+        winnerPe: null,
+        returnedByName: (cancelContext && cancelContext.name) || 'Returning Officer',
+        returnedByPe: (cancelContext && cancelContext.pe) || null,
+        shiftCountAfter: count,
+        shiftMin: min,
+        hadBidsCount,
+        whyWon: whyCanceled,
+        whyCanceled,
+        totalBids: recipients.length,
+        bidderReceipts: recipients
+      };
+
+      eng.closedNotifications.unshift(cancelRecord);
+      if (eng.closedNotifications.length > 12) {
+        eng.closedNotifications.pop();
+      }
+
+      app.toastData = {
+        status: 'approved',
+        title: `🚫 Un-Awarded Hire-Back Canceled (${posting.id}) — Shift Restored to Minimum (${count}/${min})`,
+        step1: `Step 1 (Shift Count at Minimum): ${returnReason}. Shift Count is now ${count} (Minimum ${min}).`,
+        step2: `Step 2 (Hire-Back Canceled Prior to Award): ${posting.id} for Unit ${posting.targetUnit} (${posting.targetDiv}) was not awarded yet (${modeDesc}) and has been automatically CANCELED.`,
+        step3: `Step 3 (Opted-In Officers Notified): Cancellation push notification sent to all ${recipients.length} Opted-In Officer(s)${hadBidsCount > 0 ? ` (including ${hadBidsCount} active bidder(s))` : ''}.`
+      };
+
+      app.auditEntries.unshift({
+        time: canceledTime,
+        tag: 'Hire-Back Canceled 🚫',
+        msg: `[${posting.id}] CANCELED prior to award (${modeDesc}): ${returnReason}. Sent cancellation notification to all ${recipients.length} Opted-In Officer(s).`
+      });
+    }
+
+    if (getShiftCount() >= app.shiftMin && Array.isArray(app.hireBackBids)) {
+      app.hireBackBids = [];
+    }
+  }
+
   function checkAndCreatePostingsForCurrentShortages(triggerContext) {
     const eng = ensureEngineState();
     if (!eng) return;
@@ -852,8 +1001,11 @@
       });
     }
 
-    if (neededOfficers === 0 && activeOfficerPostings.length > 0) {
-      eng.openPostings = eng.openPostings.filter(p => p.category !== 'OFFICER');
+    // If someone returned to their shift and placed the count at or above minimum (or reduced the shortage) while a Hire-Back is NOT awarded yet:
+    if (neededOfficers < activeOfficerPostings.length && activeOfficerPostings.length > 0) {
+      const cancelCount = activeOfficerPostings.length - neededOfficers;
+      const postingsToCancel = activeOfficerPostings.slice(0, cancelCount);
+      cancelUnAwardedPostings(postingsToCancel, triggerContext);
     }
 
     const supAudit = auditSupervisorMinimums();
@@ -873,7 +1025,11 @@
         blockType: supAudit.deficitType === 'PARTIAL_LT' ? 'FIRST_4H' : 'FULL_SHIFT'
       });
     } else if (!supAudit.needsSupervisorHireBack && activeSupPostings.length > 0) {
-      eng.openPostings = eng.openPostings.filter(p => p.category !== 'SUPERVISOR');
+      cancelUnAwardedPostings(activeSupPostings, {
+        name: (triggerContext && triggerContext.name) || 'Supervisor Returned',
+        pe: (triggerContext && triggerContext.pe) || null,
+        reason: (triggerContext && triggerContext.reason) || 'Command supervisor returned to duty; quadrant & COD minimums satisfied'
+      });
     }
   }
 
@@ -890,6 +1046,11 @@
 
       let expiredIds = [];
       for (const p of openList) {
+        // If <24h FCFS and no one has bid yet, keep the posting open awaiting the first claim or return-to-work cancellation
+        if (p.awardRule === 'FCFS' && p.bids.length === 0) {
+          p.secondsRemaining = p.secondsRemaining > 1 ? p.secondsRemaining - 1 : p.secondsTotal;
+          continue;
+        }
         p.secondsRemaining = Math.max(0, p.secondsRemaining - 1);
         if (p.secondsRemaining <= 0) {
           expiredIds.push(p.id);
@@ -1157,6 +1318,16 @@
           : 'SENIORITY';
         p.secondsTotal = p.awardRule === 'FCFS' ? FCFS_AUTO_FILL_SECONDS : BID_WINDOW_SECONDS;
         p.secondsRemaining = Math.min(p.secondsRemaining || p.secondsTotal, p.secondsTotal);
+
+        if (p.awardRule === 'FCFS') {
+          // Under 24h First-Come, First-Served: clear un-awarded seniority bids so it awaits the 1st bidder claim (or cancels if someone returns to shift)
+          p.bids = [];
+          if (p.category === 'OFFICER' && Array.isArray(app.hireBackBids)) {
+            app.hireBackBids = [];
+          }
+        } else if (p.awardRule === 'SENIORITY' && p.bids.length === 0 && eng.autoSimulateBids) {
+          scheduleSimulatedBidsForPosting(p);
+        }
       }
     }
 
@@ -1175,9 +1346,7 @@
           p.awardRule = 'FCFS';
           p.secondsTotal = FCFS_AUTO_FILL_SECONDS;
           p.secondsRemaining = FCFS_AUTO_FILL_SECONDS;
-          if (p.bids.length === 0 && eng.autoSimulateBids) {
-            scheduleSimulatedBidsForPosting(p);
-          }
+          p.bids = [];
         }
       }
     }
@@ -1201,7 +1370,82 @@
   };
 
   window.expirePostingNow = function (postingId) {
+    const eng = ensureEngineState();
+    const posting = eng ? eng.openPostings.find(p => p.id === postingId) : null;
+    if (posting && posting.bids.length === 0) {
+      window.simulateFirstBidderClaimNow(postingId);
+      return;
+    }
     finalizeHireBackAward(postingId, 'MANUAL_FAST_FORWARD');
+  };
+
+  window.simulateFirstBidderClaimNow = function (postingId) {
+    const eng = ensureEngineState();
+    if (!eng) return;
+    const posting = eng.openPostings.find(p => p.id === postingId);
+    if (!posting) return;
+
+    const eligiblePool = EXTENDED_CANDIDATE_POOL.filter(c => evaluateBidderEligibility(c, posting).eligible);
+    const firstClaimant = posting.category === 'SUPERVISOR'
+      ? eligiblePool[0]
+      : ( { name: 'AGUILERA, A', pe: 1997, role: 'OFFICER', bureau: 'OPS', div: 'NE', shift: 'B', badgeLabel: 'Uniform (B-Shift)' } );
+
+    if (firstClaimant) {
+      submitBidToPosting(postingId, firstClaimant, 'Instant Manual Claim');
+      if (posting.awardRule !== 'FCFS') {
+        finalizeHireBackAward(postingId, 'MANUAL_FAST_FORWARD');
+      } else {
+        renderAll();
+      }
+    }
+  };
+
+  window.returnOfficerToCancelHireBack = function (postingId) {
+    const eng = ensureEngineState();
+    if (!eng) return;
+    const posting = postingId
+      ? eng.openPostings.find(p => p.id === postingId)
+      : eng.openPostings[0];
+
+    if (posting && posting.category === 'SUPERVISOR' && eng.commandOffRoster.length > 0) {
+      const supRec = eng.commandOffRoster[eng.commandOffRoster.length - 1];
+      window.restoreSupervisorToDuty(supRec.pe);
+      return;
+    }
+
+    // 1. Check if any officer marked off on the current shift today (e.g., MAURER #1883 in app.dayOffRoster)
+    for (const div of DIV_KEYS) {
+      const list = app.dayOffRoster && app.dayOffRoster[div];
+      if (Array.isArray(list) && list.length > 0) {
+        const lastOff = list[list.length - 1];
+        if (typeof window.restoreOfficerFromDayOff === 'function') {
+          window.restoreOfficerFromDayOff(div, lastOff.homeUnit);
+          return;
+        }
+      }
+    }
+
+    // 2. Otherwise return an officer from Scheduled Off-Time (e.g., ENGELMAN, D #1586 from Vacation)
+    if (app.offTimeSheet && typeof window.returnStaticOfficerToWork === 'function') {
+      for (const colKey of ['vacation', 'dayOff', 'sickAndLeave', 'trainingAndSpecial']) {
+        if (Array.isArray(app.offTimeSheet[colKey]) && app.offTimeSheet[colKey].length > 0) {
+          window.returnStaticOfficerToWork(colKey, 0, posting ? posting.targetDiv : null, false);
+          return;
+        }
+      }
+    }
+
+    // 3. Fallback: adjust minimum to match current count if no off-time officers exist
+    if (getShiftCount() < app.shiftMin && typeof window.changeMinimum === 'function') {
+      window.changeMinimum(getShiftCount() - app.shiftMin);
+    }
+  };
+
+  window.dismissCanceledNotification = function (postId) {
+    const eng = ensureEngineState();
+    if (!eng) return;
+    eng.closedNotifications = eng.closedNotifications.filter(n => n.id !== postId);
+    renderAll();
   };
 
   window.splitPostingToPartialsNow = function (postingId) {
@@ -1271,6 +1515,7 @@
     const openPostings = eng.openPostings;
     const openCount = openPostings.length;
     const standbyCount = eng.supervisorStandbyList.length;
+    const recentCanceled = eng.closedNotifications.filter(n => n.recordType === 'CANCELED').slice(0, 1);
 
     const qBadges = DIV_KEYS.map(d => {
       const c = supAudit.quadrantSgts[d] || 0;
@@ -1290,29 +1535,35 @@
             if (p.category === 'OFFICER') syncAppHireBackBidsIntoPosting(p);
             const sortedBids = sortBidsForPosting(p.bids, p);
             const leader = sortedBids[0];
+            const isFcfsUnclaimed = p.awardRule === 'FCFS' && sortedBids.length === 0;
             const pct = Math.max(0, Math.min(100, Math.round((p.secondsRemaining / p.secondsTotal) * 100)));
             return `
               <div class="p-3 rounded-xl bg-slate-950/95 border-2 ${p.awardRule === 'FCFS' ? 'border-amber-400' : 'border-emerald-400'} space-y-2 shadow-xl">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <div class="flex items-center gap-2">
                     <span class="px-2 py-0.5 rounded-md font-mono font-black text-xs ${p.awardRule === 'FCFS' ? 'bg-amber-400 text-slate-950' : 'bg-emerald-400 text-slate-950'}">
-                      ⏱️ AUTO-AWARD IN <span id="hbTopTimerText-${p.id}">${p.secondsRemaining}s</span>
+                      ${isFcfsUnclaimed ? `⚡ <24h FCFS OPEN (0 BIDS YET)` : `⏱️ AUTO-AWARD IN <span id="hbTopTimerText-${p.id}">${p.secondsRemaining}s</span>`}
                     </span>
                     <span class="font-extrabold text-xs md:text-sm text-white">
-                      ${p.id}: Auto-Bidding Open for Unit ${p.targetUnit} (${p.targetDiv}) • ${p.blockType.replace('_', ' ')} (${p.durationHrs})
+                      ${p.id}: Un-Awarded Hire-Back for Unit ${p.targetUnit} (${p.targetDiv}) • ${p.blockType.replace('_', ' ')} (${p.durationHrs})
                     </span>
                   </div>
-                  <div class="flex items-center gap-1.5">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <button type="button" onclick="returnOfficerToCancelHireBack('${p.id}')" class="px-2.5 py-1 rounded-lg bg-red-600/90 hover:bg-red-500 text-white border border-red-400/50 text-[11px] font-extrabold cursor-pointer shadow" title="Simulate an off-time officer returning to their shift to place count at minimum, cancel this un-awarded Hire-Back, and notify all Opted-In Officers">
+                      ↩️ Return Officer to Shift (Cancel HB &amp; Notify Opt-Ins)
+                    </button>
                     ${p.blockType === 'FULL_SHIFT' && p.category === 'OFFICER' ? `
                       <button type="button" onclick="splitPostingToPartialsNow('${p.id}')" class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-bold cursor-pointer">
                         ✂️ Split to 4h Blocks
                       </button>
                     ` : ''}
-                    <button type="button" onclick="toggleHbTimerPause()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold cursor-pointer">
-                      ${eng.timerPaused ? '▶ Resume Timer' : '⏸ Pause Timer'}
-                    </button>
+                    ${!isFcfsUnclaimed ? `
+                      <button type="button" onclick="toggleHbTimerPause()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold cursor-pointer">
+                        ${eng.timerPaused ? '▶ Resume Timer' : '⏸ Pause Timer'}
+                      </button>
+                    ` : ''}
                     <button type="button" onclick="expirePostingNow('${p.id}')" class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-extrabold cursor-pointer shadow">
-                      ⏩ Expire &amp; Auto-Populate Now
+                      ${isFcfsUnclaimed ? '⚡ Simulate 1st Bidder Claim (FCFS)' : '⏩ Expire &amp; Auto-Populate Now'}
                     </button>
                   </div>
                 </div>
@@ -1324,19 +1575,61 @@
                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
                   <div class="flex flex-wrap items-center gap-1.5">
                     <span class="text-slate-400 font-semibold text-[11px]">Live Incoming Bids (${sortedBids.length}):</span>
-                    ${sortedBids.map((b, idx) => `
+                    ${sortedBids.length === 0 ? `
+                      <span class="px-2 py-0.5 rounded font-mono text-[11px] bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+                        ⏳ No bids placed yet — Open to all Opted-In Officers (If someone returns to shift, HB cancels &amp; notifies Opt-Ins)
+                      </span>
+                    ` : sortedBids.map((b, idx) => `
                       <span class="px-2 py-0.5 rounded font-mono text-[11px] ${idx === 0 ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 font-extrabold' : 'bg-slate-800 text-slate-300 border border-slate-700'}">
                         ${idx === 0 ? '🏆 LEADER: ' : `#${idx + 1}: `}${b.name} (PE #${b.pe})
                       </span>
                     `).join('')}
                   </div>
                   <span class="text-[11px] text-emerald-300 font-semibold">
-                    🤖 No click needed — schedule auto-populates ${leader ? `${leader.name} (#${leader.pe})` : 'winner'} when timer hits 0s!
+                    ${isFcfsUnclaimed
+                      ? '⚡ First officer to bid wins immediately — or if shift returns to minimum first, Hire-Back cancels!'
+                      : `🤖 Un-awarded until timer hits 0s (${leader ? `Leader: ${leader.name} #${leader.pe}` : 'awaiting bids'}) — cancels if shift returns to minimum!`}
                   </span>
                 </div>
               </div>
             `;
           }).join('')}
+        </div>
+      `;
+    } else if (recentCanceled.length > 0) {
+      const c = recentCanceled[0];
+      topLiveCountdownsHtml = `
+        <div class="mt-2.5 pt-2.5 border-t border-red-500/40">
+          <div class="p-3 rounded-xl bg-red-950/90 border-2 border-red-500/80 space-y-1.5 shadow-xl">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded bg-red-500 text-white font-mono font-black text-xs">
+                  🚫 HIRE-BACK CANCELED (${c.id})
+                </span>
+                <span class="font-extrabold text-xs md:text-sm text-white">
+                  Unit ${c.unit} (${c.div}) Hire-Back Canceled Prior to Award — Shift Count Restored to Minimum (${c.shiftCountAfter}/${c.shiftMin})
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded bg-amber-400/20 text-amber-200 border border-amber-400/40 font-mono text-[11px] font-bold">
+                  📢 All ${c.totalBids} Opted-In Officers Notified
+                </span>
+                <button type="button" onclick="dismissCanceledNotification('${c.id}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10.5px] font-bold cursor-pointer">
+                  ✕ Dismiss
+                </button>
+              </div>
+            </div>
+            <div class="text-[11px] text-red-200">${c.whyCanceled}</div>
+            <div class="flex flex-wrap items-center gap-1.5 pt-1">
+              <span class="text-[10.5px] font-bold text-amber-300 uppercase">Notified Opted-In &amp; Bidding Officers:</span>
+              ${c.bidderReceipts.slice(0, 8).map(r => `
+                <span class="px-1.5 py-0.5 rounded font-mono text-[10px] ${r.hadActiveBid ? 'bg-red-500/30 text-red-200 border border-red-400/50 font-bold' : 'bg-slate-900/90 text-slate-300 border border-slate-700'}">
+                  ${r.name} (#${r.pe})${r.hadActiveBid ? ' [Bid Voided]' : ' [Opt-In Alert]'}
+                </span>
+              `).join('')}
+              ${c.bidderReceipts.length > 8 ? `<span class="text-[10px] font-mono text-slate-300">+${c.bidderReceipts.length - 8} more</span>` : ''}
+            </div>
+          </div>
         </div>
       `;
     }
@@ -1351,12 +1644,12 @@
 
           <button type="button" onclick="setHbNoticeMode('ADVANCE_24PLUS')" class="hb-mode-pill ${details.mode === 'ADVANCE_24PLUS' ? 'active-24plus' : 'inactive'}" title="Outside 24 Hours before shift start: Collects bids and auto-awards to highest seniority (lowest PE# with Uniform priority) when window expires">
             <span>🕒 ≥ 24h Notice</span>
-            <span class="opacity-80 font-normal">(12s Auto-Bid Pool → Seniority)</span>
+            <span class="opacity-80 font-normal">(20s Bid Window → Seniority)</span>
           </button>
 
           <button type="button" onclick="setHbNoticeMode('SHORT_UNDER24')" class="hb-mode-pill ${details.mode === 'SHORT_UNDER24' ? 'active-under24' : 'inactive'}" title="Inside 24 Hours before shift start: Broadcasts via Radio/MDC/App and auto-populates First-Come, First-Served (includes DB & Exempt)">
             <span>⚡ &lt; 24h Short Notice</span>
-            <span class="opacity-80 font-normal">(4s Instant FCFS)</span>
+            <span class="opacity-80 font-normal">(0 Bids → 1st Bidder Wins FCFS)</span>
           </button>
 
           <button type="button" onclick="setHbNoticeMode('SHIFT_STARTED')" class="hb-mode-pill ${details.mode === 'SHIFT_STARTED' ? 'active-started' : 'inactive'}" title="Shift already started: FOPLC Art. 24 §4D freezes hire-backs unless Duty Chief authorizes">
@@ -1492,7 +1785,7 @@
 
     if (openPostings.length > 0) {
       hbBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300 animate-pulse';
-      hbBadge.textContent = `⏱️ ${openPostings.length} Auto-Bidding`;
+      hbBadge.textContent = `⏱️ ${openPostings.length} Un-Awarded Open`;
     } else if (count < min || supAudit.needsSupervisorHireBack) {
       hbBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-600 dark:text-red-300';
       hbBadge.textContent = `Shortage Detected`;
@@ -1506,16 +1799,17 @@
     for (const p of openPostings) {
       if (p.category === 'OFFICER') syncAppHireBackBidsIntoPosting(p);
       const sortedBids = sortBidsForPosting(p.bids, p);
+      const isFcfsUnclaimed = p.awardRule === 'FCFS' && sortedBids.length === 0;
       const pct = Math.max(0, Math.min(100, Math.round((p.secondsRemaining / p.secondsTotal) * 100)));
 
       html += `
         <div class="p-2.5 rounded-xl bg-slate-900 text-slate-100 border ${p.awardRule === 'FCFS' ? 'border-amber-500/60' : 'border-blue-500/60'} space-y-2 shadow-md">
           <div class="flex items-center justify-between gap-1">
             <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-extrabold ${p.awardRule === 'FCFS' ? 'bg-amber-400 text-slate-950' : 'bg-blue-600 text-white'}">
-              ${p.id} • ${p.awardRule === 'FCFS' ? '⚡ <24h FCFS' : '🕒 ≥24h SENIORITY'}
+              ${p.id} • ${p.awardRule === 'FCFS' ? '⚡ <24h FCFS (UN-AWARDED)' : '🕒 ≥24h SENIORITY (UN-AWARDED)'}
             </span>
             <span class="font-mono text-[11px] font-extrabold text-emerald-300">
-              Auto-Award in <span id="hbTimerText-${p.id}">${p.secondsRemaining}s</span>
+              ${isFcfsUnclaimed ? '0 Bids • Awaiting 1st Claim' : `Auto-Award in <span id="hbTimerText-${p.id}">${p.secondsRemaining}s</span>`}
             </span>
           </div>
 
@@ -1526,9 +1820,13 @@
           <div class="p-2 rounded-lg bg-slate-950/90 border border-slate-800 space-y-1">
             <div class="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
               <span>Live Incoming Officer Bids (${sortedBids.length}):</span>
-              <span>Auto-populates at 0s</span>
+              <span>${isFcfsUnclaimed ? '1st Bidder Wins Immediately' : 'Auto-populates at 0s'}</span>
             </div>
-            ${sortedBids.map((b, idx) => `
+            ${sortedBids.length === 0 ? `
+              <div class="text-[10.5px] font-mono text-amber-300 px-1.5 py-1 rounded bg-amber-500/10 border border-amber-500/30">
+                ⏳ 0 Bids placed yet — Broadcasted to all ${optInCount} Opted-In Officers. If someone returns to shift, this Hire-Back cancels &amp; notifies all Opted-In Officers!
+              </div>
+            ` : sortedBids.map((b, idx) => `
               <div class="flex items-center justify-between text-[10.5px] font-mono px-1.5 py-0.5 rounded ${idx === 0 ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30' : 'text-slate-400'}">
                 <span>${idx === 0 ? '🏆 LEADER: ' : `#${idx + 1} Standby: `}${b.name} (PE #${b.pe})</span>
                 <span class="text-[9.5px]">${b.badgeLabel}</span>
@@ -1536,13 +1834,18 @@
             `).join('')}
           </div>
 
-          <div class="flex items-center gap-1.5 pt-0.5">
-            <button type="button" onclick="expirePostingNow('${p.id}')" class="flex-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-extrabold cursor-pointer shadow">
-              ⏩ Expire &amp; Auto-Award Winner Now
+          <div class="flex flex-col gap-1.5 pt-0.5">
+            <button type="button" onclick="returnOfficerToCancelHireBack('${p.id}')" class="w-full px-2.5 py-1.5 rounded-lg bg-red-600/90 hover:bg-red-500 text-white text-[11px] font-extrabold cursor-pointer shadow">
+              ↩️ Return Officer to Shift (Cancel HB &amp; Notify ${optInCount} Opt-Ins)
             </button>
-            <button type="button" onclick="toggleHbTimerPause()" class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[10.5px] font-bold cursor-pointer">
-              ${eng.timerPaused ? '▶' : '⏸'}
-            </button>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="expirePostingNow('${p.id}')" class="flex-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-extrabold cursor-pointer shadow">
+                ${isFcfsUnclaimed ? '⚡ Simulate 1st Bidder Claim (FCFS)' : '⏩ Expire &amp; Auto-Award Winner Now'}
+              </button>
+              <button type="button" onclick="toggleHbTimerPause()" class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[10.5px] font-bold cursor-pointer">
+                ${eng.timerPaused ? '▶' : '⏸'}
+              </button>
+            </div>
           </div>
         </div>
       `;
@@ -1550,32 +1853,61 @@
 
     if (recentClosed.length > 0) {
       for (const n of recentClosed) {
-        html += `
-          <div class="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/40 text-[11px] space-y-1">
-            <div class="flex items-center justify-between">
-              <span class="font-extrabold text-emerald-600 dark:text-emerald-300">
-                ✅ ${n.id} Auto-Populated → ${n.winnerName} (#${n.winnerPe}) in ${n.unit} (${n.div})
-              </span>
-              <span class="font-mono text-[10px] text-[var(--text-muted)]">${n.closedAt}</span>
-            </div>
-            <div class="text-[10px] text-[var(--text-muted)]">${n.whyWon}</div>
-            <div class="pt-1 border-t border-emerald-500/20 space-y-0.5">
-              <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                📢 Automated Notifications Sent to All ${n.totalBids} Bidder(s):
+        if (n.recordType === 'CANCELED') {
+          html += `
+            <div class="p-2.5 rounded-xl bg-red-950/35 border-2 border-red-500/50 text-[11px] space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="font-extrabold text-red-600 dark:text-red-300">
+                  🚫 ${n.id} Canceled Prior to Award → Shift at Minimum (${n.shiftCountAfter}/${n.shiftMin})
+                </span>
+                <span class="font-mono text-[10px] text-[var(--text-muted)]">${n.closedAt}</span>
               </div>
-              ${n.bidderReceipts.map(r => `
-                <div class="flex items-center justify-between text-[10px] font-mono">
-                  <span class="${r.outcome === 'AWARDED' ? 'font-bold text-emerald-600 dark:text-emerald-300' : 'text-[var(--text-muted)]'}">
-                    • ${r.name} (#${r.pe})
-                  </span>
-                  <span class="px-1.5 py-0.2 rounded ${r.outcome === 'AWARDED' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-bold' : 'bg-slate-500/15 text-[var(--text-muted)]'}">
-                    ${r.outcome}
-                  </span>
+              <div class="text-[10px] text-[var(--text-muted)]">${n.whyCanceled}</div>
+              <div class="pt-1 border-t border-red-500/25 space-y-0.5 max-h-36 overflow-y-auto">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-300">
+                  📢 Cancellation Alert Sent to All ${n.totalBids} Opted-In &amp; Bidding Officer(s):
                 </div>
-              `).join('')}
+                ${n.bidderReceipts.map(r => `
+                  <div class="flex items-center justify-between text-[10px] font-mono py-0.5">
+                    <span class="${r.hadActiveBid ? 'font-bold text-red-600 dark:text-red-300' : 'text-[var(--text-main)]'}">
+                      • ${r.name} (#${r.pe}) <span class="text-[9px] text-[var(--text-muted)]">${r.badgeLabel || ''}</span>
+                    </span>
+                    <span class="px-1.5 py-0.2 rounded ${r.hadActiveBid ? 'bg-red-500/25 text-red-600 dark:text-red-300 font-bold' : 'bg-amber-500/15 text-amber-600 dark:text-amber-300 font-semibold'}">
+                      ${r.outcome}
+                    </span>
+                  </div>
+                `).join('')}
+              </div>
             </div>
-          </div>
-        `;
+          `;
+        } else {
+          html += `
+            <div class="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/40 text-[11px] space-y-1">
+              <div class="flex items-center justify-between">
+                <span class="font-extrabold text-emerald-600 dark:text-emerald-300">
+                  ✅ ${n.id} Auto-Populated → ${n.winnerName} (#${n.winnerPe}) in ${n.unit} (${n.div})
+                </span>
+                <span class="font-mono text-[10px] text-[var(--text-muted)]">${n.closedAt}</span>
+              </div>
+              <div class="text-[10px] text-[var(--text-muted)]">${n.whyWon}</div>
+              <div class="pt-1 border-t border-emerald-500/20 space-y-0.5">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  📢 Automated Notifications Sent to All ${n.totalBids} Bidder(s):
+                </div>
+                ${n.bidderReceipts.map(r => `
+                  <div class="flex items-center justify-between text-[10px] font-mono">
+                    <span class="${r.outcome === 'AWARDED' ? 'font-bold text-emerald-600 dark:text-emerald-300' : 'text-[var(--text-muted)]'}">
+                      • ${r.name} (#${r.pe})
+                    </span>
+                    <span class="px-1.5 py-0.2 rounded ${r.outcome === 'AWARDED' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-bold' : 'bg-slate-500/15 text-[var(--text-muted)]'}">
+                      ${r.outcome}
+                    </span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }
       }
     }
 
@@ -1603,6 +1935,7 @@
     const recentClosed = eng.closedNotifications.slice(0, 2);
     const activePe = app.loggedInPe === 'COD' ? 1883 : app.loggedInPe;
     const markedOffSelf = didMemberMarkOffCurrentShift(activePe);
+    const optInCount = Array.isArray(app.hireBackOptInPes) ? app.hireBackOptInPes.length : 12;
 
     const section = document.createElement('div');
     section.id = 'mobileHbLiveCenter';
@@ -1614,7 +1947,7 @@
           🔔 Zero-Touch Hire-Back Alerts (${details.mode === 'ADVANCE_24PLUS' ? '≥24h Seniority' : '<24h FCFS'})
         </span>
         <span class="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[9.5px]">
-          Auto-Award
+          ${optInCount} Opted-In 🔔
         </span>
       </div>
     `;
@@ -1623,6 +1956,7 @@
       if (p.category === 'OFFICER') syncAppHireBackBidsIntoPosting(p);
       const sortedBids = sortBidsForPosting(p.bids, p);
       const leader = sortedBids[0];
+      const isFcfsUnclaimed = p.awardRule === 'FCFS' && sortedBids.length === 0;
 
       html += `
         <div class="p-3 rounded-2xl bg-amber-500/15 border-2 border-amber-400 space-y-2">
@@ -1631,17 +1965,21 @@
               🚨 ${p.id}: ${p.targetUnit} (${p.targetDiv}) • ${p.durationHrs}
             </span>
             <span class="px-2 py-0.5 rounded bg-emerald-500 text-slate-950 font-mono text-[11px] font-black">
-              ⏱️ <span id="hbMobTimerText-${p.id}">${p.secondsRemaining}s</span>
+              ${isFcfsUnclaimed ? '0 Bids (FCFS)' : `⏱️ <span id="hbMobTimerText-${p.id}">${p.secondsRemaining}s</span>`}
             </span>
           </div>
           <div class="text-[10.5px] text-slate-200">
-            <strong>Auto-Award Rule:</strong> ${p.awardRule === 'FCFS' ? 'Instant First-Come, First-Served (<24h)' : 'Seniority Bid Pool (≥24h — Lowest PE# Wins at 0s)'}
+            <strong>Status:</strong> ${isFcfsUnclaimed ? 'Under 24h FCFS Open — No bids yet (1st claim wins, or cancels if shift returns to min)' : 'Outside 24h Seniority Window Open — Not awarded yet (Cancels if shift returns to min)'}
           </div>
           ${leader ? `
             <div class="text-[10px] font-mono text-emerald-300 bg-slate-900/90 px-2 py-1 rounded border border-slate-800">
               🏆 Current Leader: ${leader.name} (#${leader.pe}) • ${sortedBids.length} Bid(s)
             </div>
           ` : ''}
+
+          <button type="button" onclick="returnOfficerToCancelHireBack('${p.id}')" class="w-full py-1.5 px-2.5 rounded-xl bg-red-600/90 hover:bg-red-500 text-white font-extrabold text-[10.5px] cursor-pointer shadow">
+            ↩️ Return Officer to Shift (Cancel HB &amp; Notify Opt-Ins)
+          </button>
 
           ${markedOffSelf ? `
             <div class="w-full p-2 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 text-[10px] font-bold text-center">
@@ -1653,18 +1991,36 @@
     }
 
     for (const n of recentClosed) {
-      html += `
-        <div class="p-3 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 space-y-1.5">
-          <div class="flex items-center justify-between">
-            <span class="text-[10px] font-extrabold text-emerald-300">📢 AUTO-AWARD NOTIFICATION SENT</span>
-            <span class="font-mono text-[9.5px] text-slate-400">${n.id}</span>
+      if (n.recordType === 'CANCELED') {
+        html += `
+          <div class="p-3 rounded-2xl bg-red-950/80 border-2 border-red-500/70 space-y-1.5 shadow-lg">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-extrabold text-red-300">🚫 HIRE-BACK CANCELED ALERT (OPT-IN PUSH)</span>
+              <span class="font-mono text-[9.5px] text-red-200">${n.id} • ${n.closedAt}</span>
+            </div>
+            <div class="text-[11px] font-bold text-white">
+              Unit ${n.unit} (${n.div}) Canceled — Shift Back at Minimum (${n.shiftCountAfter}/${n.shiftMin})
+            </div>
+            <div class="text-[10px] text-red-200">${n.whyCanceled}</div>
+            <div class="pt-1 border-t border-red-500/30 text-[9.5px] font-mono text-amber-200">
+              🔔 Push sent to all ${n.totalBids} Opted-In Officer(s)${n.hadBidsCount > 0 ? ` (${n.hadBidsCount} pending bid(s) voided)` : ''}.
+            </div>
           </div>
-          <div class="text-[11px] font-bold text-white">
-            Awarded: ${n.winnerName} (#${n.winnerPe}) → Unit ${n.unit} (${n.div})
+        `;
+      } else {
+        html += `
+          <div class="p-3 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-extrabold text-emerald-300">📢 AUTO-AWARD NOTIFICATION SENT</span>
+              <span class="font-mono text-[9.5px] text-slate-400">${n.id}</span>
+            </div>
+            <div class="text-[11px] font-bold text-white">
+              Awarded: ${n.winnerName} (#${n.winnerPe}) → Unit ${n.unit} (${n.div})
+            </div>
+            <div class="text-[10px] text-emerald-200">${n.whyWon}</div>
           </div>
-          <div class="text-[10px] text-emerald-200">${n.whyWon}</div>
-        </div>
-      `;
+        `;
+      }
     }
 
     html += `
@@ -1720,8 +2076,21 @@
     const origRestoreOfficer = window.restoreOfficerFromDayOff;
     if (typeof origRestoreOfficer === 'function') {
       window.restoreOfficerFromDayOff = function (div, homeUnit) {
+        const entry = (app.dayOffRoster && app.dayOffRoster[div])
+          ? app.dayOffRoster[div].find(o => o.homeUnit === homeUnit)
+          : null;
+        const returningName = entry ? entry.name : 'Officer';
+        const returningPe = entry ? entry.pe : null;
+
         origRestoreOfficer.apply(this, arguments);
-        checkAndCreatePostingsForCurrentShortages();
+
+        checkAndCreatePostingsForCurrentShortages({
+          div,
+          unit: homeUnit,
+          name: returningName,
+          pe: returningPe,
+          reason: `${returningName}${returningPe ? ` (#${returningPe})` : ''} canceled leave and returned to ${homeUnit} (${div})`
+        });
         renderControlStrip();
         renderEnhancedCommandRows();
         renderEnhancedHireBackCard();
@@ -1731,9 +2100,24 @@
 
     const origReturnStatic = window.returnStaticOfficerToWork;
     if (typeof origReturnStatic === 'function') {
-      window.returnStaticOfficerToWork = function (categoryKey, div, idx, pe) {
+      window.returnStaticOfficerToWork = function (colKey, idx, preferredDiv, asHireBack) {
+        const rawStr = (app.offTimeSheet && app.offTimeSheet[colKey]) ? app.offTimeSheet[colKey][idx] : '';
+        const parsed = (typeof window.parseStaticOffTimeString === 'function' && rawStr)
+          ? window.parseStaticOffTimeString(rawStr, colKey, idx)
+          : null;
+        const returningName = parsed ? parsed.name : 'Off-Time Officer';
+        const returningPe = parsed ? parsed.pe : null;
+        const returningTag = parsed ? parsed.tag : 'Scheduled Off-Time';
+
         origReturnStatic.apply(this, arguments);
-        checkAndCreatePostingsForCurrentShortages();
+
+        checkAndCreatePostingsForCurrentShortages({
+          div: preferredDiv || 'NW',
+          unit: 'RTW',
+          name: returningName,
+          pe: returningPe,
+          reason: `${returningName}${returningPe ? ` (#${returningPe})` : ''} canceled ${returningTag} and returned to ${app.selectedShift}-Shift`
+        });
         renderControlStrip();
         renderEnhancedCommandRows();
         renderEnhancedHireBackCard();
@@ -1758,15 +2142,25 @@
       };
     }
 
-    const origSubmitHbBid = window.submitHireBackBid;
-    if (typeof origSubmitHbBid === 'function') {
-      window.submitHireBackBid = function (pe, keepOpen) {
-        origSubmitHbBid.apply(this, arguments);
+    const origSubmitOfficerHbBid = window.submitOfficerHireBackBid;
+    if (typeof origSubmitOfficerHbBid === 'function') {
+      window.submitOfficerHireBackBid = function (pe, name, shift, unit, instantClaimIfUnder24Hr) {
+        origSubmitOfficerHbBid.apply(this, arguments);
         const eng = ensureEngineState();
         if (eng) {
-          for (const p of eng.openPostings) {
+          for (const p of [...eng.openPostings]) {
             if (p.category === 'OFFICER') {
-              syncAppHireBackBidsIntoPosting(p);
+              const cand = {
+                name: name || `OFFICER #${pe}`,
+                pe: Number(pe),
+                role: 'OFFICER',
+                bureau: shift === 'DB' ? 'DB' : 'OPS',
+                div: 'NE',
+                shift: shift || 'B',
+                badgeLabel: shift ? `Uniform (${shift}-Shift)` : 'Uniform'
+              };
+              const src = p.awardRule === 'FCFS' ? 'Instant Manual Claim' : 'Officer Bid';
+              submitBidToPosting(p.id, cand, src);
             }
           }
         }
