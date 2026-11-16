@@ -670,10 +670,28 @@
       if (targetRow) {
         targetRow.name = winner.name;
         targetRow.pe = winner.pe;
+        targetRow.partner = '';
         targetRow.isHireBack = true;
+        targetRow.isReturnedOffTime = false;
+        targetRow.hireBackShift = winner.shift || 'B';
         targetRow.assign = assignBadge;
         targetRow.floatedTo = null;
       }
+      if (Array.isArray(app.hireBackBids)) {
+        app.hireBackBids = app.hireBackBids.filter(b => b.pe !== winner.pe);
+        if (getShiftCount() >= app.shiftMin) {
+          app.hireBackBids = [];
+        }
+      }
+      app.hireBackLastWinnerNotification = {
+        pe: winner.pe,
+        name: winner.name,
+        shift: winner.shift || 'B',
+        assignedUnit: placedUnit,
+        assignedDiv: placedDiv,
+        ruleLabel: `${posting.awardRule === 'FCFS' ? '<24h First-Come, First-Served' : '≥24h Seniority Bid'} • Auto-Awarded (${posting.durationHrs})`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      };
     }
 
     const closedTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
