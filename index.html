@@ -217,7 +217,7 @@
     <!-- =================================================================== -->
     <!-- TOP MODERN APPLICATION NAVBAR                                       -->
     <!-- =================================================================== -->
-    <header class="bg-slate-900 text-white rounded-2xl px-4 py-2.5 shadow-lg border border-slate-800">
+    <header class="relative bg-slate-900 text-white rounded-2xl pl-4 pr-20 py-2.5 shadow-lg border border-slate-800">
       <div class="flex flex-wrap items-center justify-between gap-3">
 
         <!-- Left: Brand Identity & View Mode Toggle -->
@@ -293,7 +293,7 @@
           </div>
         </div>
 
-        <!-- Right: Logged-In User, Float Policy, Theme & Export -->
+        <!-- Right: Logged-In User, Float Policy & Reset -->
         <div class="flex flex-wrap items-center gap-1.5">
           <div class="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700 rounded-xl px-2.5 py-1">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
@@ -309,19 +309,18 @@
             </select>
           </div>
 
-          <button onclick="toggleTheme()" id="themeToggleBtn" class="px-2 py-1 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer" title="Toggle Light / Dark Mode">
-            🌙
-          </button>
-
           <button onclick="resetSchedule()" class="px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer" title="Reset Current Shift">
             ↺ Reset
           </button>
-
-          <button id="publishHelperBtn" onclick="openPublishModalAndCopy()" class="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/40 transition cursor-pointer">
-            🚀 Copy HTML
-          </button>
         </div>
 
+      </div>
+
+      <!-- Lower-Right Utility Cluster: Theme Toggle & Settings Cog -->
+      <div id="headerCornerUtils" class="absolute right-2 bottom-1.5 flex items-center gap-1">
+        <button onclick="toggleTheme()" id="themeToggleBtn" class="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center text-xs transition cursor-pointer" title="Switch to Dark Mode" aria-label="Toggle Light / Dark Mode">
+          🌙
+        </button>
       </div>
     </header>
 
@@ -352,17 +351,11 @@
                 <span id="sheetMinText">MINIMUM COUNT</span>
               </div>
 
-              <div class="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)]">
-                <span class="text-[var(--text-muted)] text-[11px] font-medium">Min:</span>
-                <button onclick="changeMinimum(-1)" class="w-5 h-5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 font-bold text-xs cursor-pointer">−</button>
-                <span id="demoMinControlVal" class="font-bold font-mono px-1">32</span>
-                <button onclick="changeMinimum(1)" class="w-5 h-5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 font-bold text-xs cursor-pointer">+</button>
-                <button onclick="setMinForVacationDemo()" class="ml-1 px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-[10px] font-semibold transition cursor-pointer" title="Sets Shift Minimum to 31 so Shift Count 32 has 1 open Vacation/Day-Off slot">
-                  Open 1 Leave Slot (Min 31)
-                </button>
-              </div>
+              <button type="button" onclick="setMinForVacationDemo()" class="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-semibold shadow-xs transition cursor-pointer" title="Sets Shift Minimum to 31 so Shift Count 32 has 1 open Vacation/Day-Off slot">
+                Open 1 Leave Slot (Min 31)
+              </button>
 
-              <button type="button" onclick="openAddShiftNoticePopover(event)" class="px-2.5 py-1 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] hover:bg-amber-500/10 text-[var(--text-main)] text-[11px] font-semibold transition cursor-pointer flex items-center gap-1" title="Broadcast a Guard Duty, Detail, Special Event, or Shift Alert">
+              <button type="button" onclick="openAddShiftNoticePopover(event)" class="px-2.5 py-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] hover:bg-amber-500/10 text-[var(--text-main)] text-[11px] font-semibold transition cursor-pointer flex items-center gap-1" title="Broadcast a Guard Duty, Detail, Special Event, or Shift Alert">
                 <span>+ Notice</span>
               </button>
             </div>
@@ -554,42 +547,86 @@
 
         </div>
 
-        <!-- BOTTOM ANALYTICS & CONTRACT AUDIT CARDS -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
-          <!-- Card 1: Inverse PE# Float Queue -->
-          <div class="books-sheet-card p-3.5 space-y-2">
-            <div class="flex items-center justify-between border-b border-[var(--border-grid)] pb-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                Next-to-Float PE# Queue (Art. 37 §5)
-              </span>
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-300 font-bold">
-                Highest PE# First
-              </span>
+        <!-- COLLAPSIBLE BOTTOM TOOLS: NEXT-TO-FLOAT QUEUE & CONTRACT AUDIT TRAIL (Minimized by Default) -->
+        <div class="space-y-2.5">
+          <!-- Compact Toggle Bar -->
+          <div id="bottomDrawerBar" class="books-sheet-card px-3.5 py-2 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                id="floatQueueToggleBtn"
+                onclick="toggleBottomDrawer('floatQueue')"
+                aria-expanded="false"
+                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-subtle)] hover:bg-amber-500/10 text-xs font-semibold text-[var(--text-main)] transition cursor-pointer"
+              >
+                <span>⚡ Next-to-Float PE# Queue</span>
+                <span id="floatQueueToggleBadge" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold">
+                  Art. 37 §5
+                </span>
+                <span id="floatQueueToggleChevron" class="text-[10px] text-[var(--text-muted)] transition-transform">▾</span>
+              </button>
+
+              <button
+                type="button"
+                id="auditTrailToggleBtn"
+                onclick="toggleBottomDrawer('auditTrail')"
+                aria-expanded="false"
+                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-subtle)] hover:bg-blue-500/10 text-xs font-semibold text-[var(--text-main)] transition cursor-pointer"
+              >
+                <span>📜 Contract Audit Trail</span>
+                <span id="auditTrailToggleBadge" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-300 font-bold">
+                  0
+                </span>
+                <span id="auditTrailToggleChevron" class="text-[10px] text-[var(--text-muted)] transition-transform">▾</span>
+              </button>
             </div>
-            <div id="floatQueueMiniList" class="space-y-1 max-h-44 overflow-y-auto pr-1 text-xs font-mono"></div>
+
+            <div class="flex items-center gap-2">
+              <span id="bottomDrawerHint" class="text-[11px] text-[var(--text-muted)] hidden sm:inline">
+                Click a panel to expand
+              </span>
+              <button
+                type="button"
+                id="bottomDrawerCollapseAll"
+                onclick="collapseAllBottomDrawers()"
+                class="hidden px-2.5 py-1 rounded-md text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subtle)] border border-transparent hover:border-[var(--border-grid)] transition cursor-pointer"
+              >
+                Minimize ▴
+              </button>
+            </div>
           </div>
 
-          <!-- Card 2: District Coverage & Hire-Backs -->
-          <div class="books-sheet-card p-3.5 space-y-2">
-            <div class="flex items-center justify-between border-b border-[var(--border-grid)] pb-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                Districts (A–O) &amp; Hire-Backs (Art. 35)
-              </span>
-              <span id="hireBackCountBadge" class="px-2 py-0.5 rounded text-[10px] font-bold"></span>
+          <!-- Expandable Drawer Panels (Hidden by Default) -->
+          <div id="bottomDrawerContainer" class="hidden grid grid-cols-1 gap-3.5">
+            <!-- Panel 1: Inverse PE# Float Queue -->
+            <div id="floatQueueDrawerCard" class="hidden books-sheet-card p-3.5 space-y-2">
+              <div class="flex items-center justify-between border-b border-[var(--border-grid)] pb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  Next-to-Float PE# Queue (Art. 37 §5)
+                </span>
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-300 font-bold">
+                    Highest PE# First
+                  </span>
+                  <button type="button" onclick="toggleBottomDrawer('floatQueue')" class="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-main)] px-1.5 py-0.5 rounded hover:bg-[var(--bg-subtle)] cursor-pointer" title="Minimize panel">✕</button>
+                </div>
+              </div>
+              <div id="floatQueueMiniList" class="space-y-1 max-h-56 overflow-y-auto pr-1 text-xs font-mono"></div>
             </div>
-            <div id="districtCoverageMiniGrid" class="grid grid-cols-4 gap-1 text-[11px] font-mono"></div>
-            <div id="hireBackActionBox" class="pt-1"></div>
-          </div>
 
-          <!-- Card 3: Audit Trail -->
-          <div class="books-sheet-card p-3.5 space-y-2">
-            <div class="flex items-center justify-between border-b border-[var(--border-grid)] pb-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                Contract Audit Trail
-              </span>
-              <span class="text-[10px] text-[var(--text-muted)]">Real-Time Log</span>
+            <!-- Panel 2: Audit Trail -->
+            <div id="auditTrailDrawerCard" class="hidden books-sheet-card p-3.5 space-y-2">
+              <div class="flex items-center justify-between border-b border-[var(--border-grid)] pb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  Contract Audit Trail
+                </span>
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] text-[var(--text-muted)]">Real-Time Log</span>
+                  <button type="button" onclick="toggleBottomDrawer('auditTrail')" class="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-main)] px-1.5 py-0.5 rounded hover:bg-[var(--bg-subtle)] cursor-pointer" title="Minimize panel">✕</button>
+                </div>
+              </div>
+              <div id="auditMiniList" class="space-y-1.5 max-h-56 overflow-y-auto pr-1 text-xs"></div>
             </div>
-            <div id="auditMiniList" class="space-y-1.5 max-h-44 overflow-y-auto pr-1 text-xs"></div>
           </div>
         </div>
 
@@ -10621,7 +10658,11 @@
     function toggleTheme() {
       app.darkMode = !app.darkMode;
       document.body.classList.toggle('dark-mode', app.darkMode);
-      document.getElementById('themeToggleBtn').textContent = app.darkMode ? '☀️ Light Mode' : '🌙 Dark Mode';
+      const btn = document.getElementById('themeToggleBtn');
+      if (btn) {
+        btn.textContent = app.darkMode ? '☀️' : '🌙';
+        btn.title = app.darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+      }
     }
 
     function findOfficerByPe(peNum) {
@@ -11860,7 +11901,8 @@
 
       document.getElementById('paperShiftMin').textContent = min;
       document.getElementById('paperShiftCount').textContent = count;
-      document.getElementById('demoMinControlVal').textContent = min;
+      const demoMinEl = document.getElementById('demoMinControlVal');
+      if (demoMinEl) demoMinEl.textContent = min;
 
       // Division car counts
       for (const div of DIV_KEYS) {
@@ -12878,6 +12920,67 @@
     }
 
     // =========================================================================
+    // COLLAPSIBLE BOTTOM DRAWER (NEXT-TO-FLOAT QUEUE & CONTRACT AUDIT TRAIL)
+    // =========================================================================
+    const bottomDrawerState = {
+      floatQueue: false,
+      auditTrail: false
+    };
+
+    function syncBottomDrawerUI() {
+      const container = document.getElementById('bottomDrawerContainer');
+      const floatCard = document.getElementById('floatQueueDrawerCard');
+      const auditCard = document.getElementById('auditTrailDrawerCard');
+      const floatBtn = document.getElementById('floatQueueToggleBtn');
+      const auditBtn = document.getElementById('auditTrailToggleBtn');
+      const floatChev = document.getElementById('floatQueueToggleChevron');
+      const auditChev = document.getElementById('auditTrailToggleChevron');
+      const collapseAllBtn = document.getElementById('bottomDrawerCollapseAll');
+      const hint = document.getElementById('bottomDrawerHint');
+
+      if (!container || !floatCard || !auditCard) return;
+
+      const openCount = (bottomDrawerState.floatQueue ? 1 : 0) + (bottomDrawerState.auditTrail ? 1 : 0);
+
+      container.classList.toggle('hidden', openCount === 0);
+      container.classList.toggle('lg:grid-cols-2', openCount === 2);
+
+      floatCard.classList.toggle('hidden', !bottomDrawerState.floatQueue);
+      auditCard.classList.toggle('hidden', !bottomDrawerState.auditTrail);
+
+      if (floatBtn) {
+        floatBtn.setAttribute('aria-expanded', String(bottomDrawerState.floatQueue));
+        floatBtn.classList.toggle('border-amber-500', bottomDrawerState.floatQueue);
+        floatBtn.classList.toggle('bg-amber-500/15', bottomDrawerState.floatQueue);
+        floatBtn.classList.toggle('border-[var(--border-strong)]', !bottomDrawerState.floatQueue);
+        floatBtn.classList.toggle('bg-[var(--bg-subtle)]', !bottomDrawerState.floatQueue);
+      }
+      if (auditBtn) {
+        auditBtn.setAttribute('aria-expanded', String(bottomDrawerState.auditTrail));
+        auditBtn.classList.toggle('border-blue-500', bottomDrawerState.auditTrail);
+        auditBtn.classList.toggle('bg-blue-500/15', bottomDrawerState.auditTrail);
+        auditBtn.classList.toggle('border-[var(--border-strong)]', !bottomDrawerState.auditTrail);
+        auditBtn.classList.toggle('bg-[var(--bg-subtle)]', !bottomDrawerState.auditTrail);
+      }
+      if (floatChev) floatChev.textContent = bottomDrawerState.floatQueue ? '▴' : '▾';
+      if (auditChev) auditChev.textContent = bottomDrawerState.auditTrail ? '▴' : '▾';
+      if (collapseAllBtn) collapseAllBtn.classList.toggle('hidden', openCount === 0);
+      if (hint) hint.classList.toggle('sm:inline', openCount === 0);
+    }
+
+    function toggleBottomDrawer(panel) {
+      if (!(panel in bottomDrawerState)) return;
+      bottomDrawerState[panel] = !bottomDrawerState[panel];
+      syncBottomDrawerUI();
+    }
+
+    function collapseAllBottomDrawers() {
+      bottomDrawerState.floatQueue = false;
+      bottomDrawerState.auditTrail = false;
+      syncBottomDrawerUI();
+    }
+
+    // =========================================================================
     // RENDER BOTTOM ANALYTICS & AUDIT CARDS
     // =========================================================================
     function renderBottomPanels(count, min) {
@@ -12917,223 +13020,63 @@
              ⏸️ <strong>Floating Paused Below Min (${count}/${min}):</strong> Everyone stays in their normal assignment; the awarded Hire-Back officer fills the vacated role directly.
            </div>`
         : '';
-      document.getElementById('floatQueueMiniList').innerHTML = pauseFloatBanner + candidates.map(c => `
-        <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ${c.canFloat && count >= min ? '' : 'opacity-55'}">
-          <div class="flex items-center gap-1.5 truncate">
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold ${c.canFloat && count >= min ? 'bg-amber-500/20 text-amber-600 dark:text-amber-300' : 'bg-slate-500/15 text-[var(--text-muted)]'}">
-              ${c.canFloat ? `#${rank++}` : 'LOCK'}
-            </span>
-            <span class="font-bold truncate">${c.name} (${c.pe})</span>
-            <span class="text-[var(--text-muted)] text-[10px]">[${c.unit}]</span>
+      const floatListEl = document.getElementById('floatQueueMiniList');
+      if (floatListEl) {
+        floatListEl.innerHTML = pauseFloatBanner + candidates.map(c => `
+          <div class="flex items-center justify-between px-2 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] ${c.canFloat && count >= min ? '' : 'opacity-55'}">
+            <div class="flex items-center gap-1.5 truncate">
+              <span class="px-1.5 py-0.2 rounded text-[10px] font-bold ${c.canFloat && count >= min ? 'bg-amber-500/20 text-amber-600 dark:text-amber-300' : 'bg-slate-500/15 text-[var(--text-muted)]'}">
+                ${c.canFloat ? `#${rank++}` : 'LOCK'}
+              </span>
+              <span class="font-bold truncate">${c.name} (${c.pe})</span>
+              <span class="text-[var(--text-muted)] text-[10px]">[${c.unit}]</span>
+            </div>
+            <span class="text-[10px] text-[var(--text-muted)] shrink-0">${count < min && c.canFloat ? '⏸️ Held in Home Car' : c.reason}</span>
           </div>
-          <span class="text-[10px] text-[var(--text-muted)] shrink-0">${count < min && c.canFloat ? '⏸️ Held in Home Car' : c.reason}</span>
-        </div>
-      `).join('');
+        `).join('');
+      }
 
-      const allDists = ['A', 'B', 'C', 'E', 'F', 'G', 'I', 'J', 'K', 'L', 'D', 'M', 'N', 'O'];
-      document.getElementById('districtCoverageMiniGrid').innerHTML = allDists.map(d => {
-        const c = distCounts[d] || 0;
-        const cls = c === 0
-          ? 'bg-red-500/15 border-red-500/40 text-red-600 dark:text-red-400 font-bold'
-          : c === 1
-            ? 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300'
-            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300';
-        return `<div class="px-1.5 py-1 rounded border text-center ${cls}">${d}: <strong>${c}</strong></div>`;
-      }).join('');
+      // Update live collapsed toggle badge for Next-to-Float Queue
+      const floatToggleBadge = document.getElementById('floatQueueToggleBadge');
+      if (floatToggleBadge) {
+        const nextEligible = candidates.find(c => c.canFloat);
+        if (count < min) {
+          floatToggleBadge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-red-500/15 text-red-600 dark:text-red-300 font-bold';
+          floatToggleBadge.textContent = '⏸️ Paused';
+        } else if (nextEligible) {
+          floatToggleBadge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold';
+          floatToggleBadge.textContent = `Next: ${nextEligible.name} (#${nextEligible.pe})`;
+        } else {
+          floatToggleBadge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-500/15 text-[var(--text-muted)] font-bold';
+          floatToggleBadge.textContent = 'None Eligible';
+        }
+      }
 
-      const hbBadge = document.getElementById('hireBackCountBadge');
-      const hbBox = document.getElementById('hireBackActionBox');
+      // Preserve automated Hire-Back broadcast trigger when shift drops below minimum
       if (count < min) {
-        const needed = min - count;
         ensureAutomatedHireBackBroadcast();
-        const sortedBids = getSortedHireBackBids();
-        const winner = sortedBids[0];
-        const isSeniority = app.hireBackNoticeMode === 'SENIORITY_24HR';
+      }
 
-        hbBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-600 dark:text-red-300';
-        hbBadge.textContent = `🔔 ${needed} Hire-Back Open (${sortedBids.length} Bids)`;
-        hbBox.innerHTML = `
-          <div class="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-xs space-y-1.5 mt-1">
-            <div class="flex items-center justify-between">
-              <span class="font-bold text-red-600 dark:text-red-300 text-[11px]">Automated Hire-Back Bid Engine:</span>
-              <span class="text-[10px] font-mono text-[var(--text-muted)]">${app.hireBackOptInPes.length} Opted-In</span>
+      const auditListEl = document.getElementById('auditMiniList');
+      if (auditListEl) {
+        auditListEl.innerHTML = app.auditEntries.map(a => `
+          <div class="p-2 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] space-y-0.5">
+            <div class="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-mono">
+              <span>${a.time}</span>
+              <span class="px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-600 dark:text-blue-300 font-semibold">${a.tag}</span>
             </div>
-            <div class="grid grid-cols-2 gap-1 text-[10px] font-bold">
-              <button onclick="setHireBackNoticeMode('SENIORITY_24HR')" class="py-1 rounded cursor-pointer ${isSeniority ? 'bg-blue-600 text-white' : 'bg-[var(--bg-surface)] text-[var(--text-muted)] border border-[var(--border-grid)]'}">
-                ≥ 24hr (Seniority)
-              </button>
-              <button onclick="setHireBackNoticeMode('FCFS_UNDER_24HR')" class="py-1 rounded cursor-pointer ${!isSeniority ? 'bg-amber-400 text-slate-950' : 'bg-[var(--bg-surface)] text-[var(--text-muted)] border border-[var(--border-grid)]'}">
-                &lt; 24hr (1st-Come)
-              </button>
-            </div>
-            ${winner ? `
-              <button onclick="autoAwardWinningHireBackBid()" class="w-full px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center justify-between cursor-pointer shadow-xs">
-                <span>🏆 Award Winner: ${winner.name} (#${winner.pe})</span>
-                <span>→</span>
-              </button>
-            ` : ''}
-            <button onclick="openHireBackPopover(event)" class="w-full px-2.5 py-1 rounded-lg bg-[var(--bg-surface)] hover:bg-blue-500/10 border border-[var(--border-strong)] text-[var(--text-main)] font-semibold text-[10.5px] flex items-center justify-between cursor-pointer">
-              <span>🔍 View All Bids &amp; Opt-In Database</span>
-              <span>▾</span>
-            </button>
+            <div class="text-[var(--text-main)] leading-snug text-[11px]">${a.msg}</div>
           </div>
-        `;
-      } else {
-        hbBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300';
-        hbBadge.textContent = `Count OK (${count}/${min})`;
-        hbBox.innerHTML = '';
+        `).join('');
       }
 
-      document.getElementById('auditMiniList').innerHTML = app.auditEntries.map(a => `
-        <div class="p-2 rounded bg-[var(--bg-subtle)] border border-[var(--border-grid)] space-y-0.5">
-          <div class="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-mono">
-            <span>${a.time}</span>
-            <span class="px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-600 dark:text-blue-300 font-semibold">${a.tag}</span>
-          </div>
-          <div class="text-[var(--text-main)] leading-snug text-[11px]">${a.msg}</div>
-        </div>
-      `).join('');
-    }
-
-    // Hide export helper button automatically when live on github.io
-    if (window.location.hostname.includes('github.io')) {
-      const btn = document.getElementById('publishHelperBtn');
-      if (btn) btn.style.display = 'none';
-    }
-
-    function buildStandaloneReleaseHtml() {
-      const clone = document.documentElement.cloneNode(true);
-      // Remove preview-iframe injected 1-line style blocks so Line 2 stays clean
-      clone.querySelectorAll('head style').forEach(st => {
-        if (!st.textContent.includes('--bg-app')) st.remove();
-      });
-      const dynamicIds = [
-        '#publishHelperBtn',
-        '#publishHelperModal',
-        '#hbZeroTouchControlBar',
-        '#persistenceStatusBadge',
-        '#printRollCallBtn',
-        '#backupExportDropdownWrap',
-        '#printRollCallFooter',
-        '#rollCallPrintPreviewToolbar',
-        '#hbBidderNotificationModal',
-        '#mobileHbLiveCenter'
-      ];
-      clone.querySelectorAll(dynamicIds.join(', ')).forEach(el => el.remove());
-      const toast = clone.querySelector('#transactionToast');
-      if (toast) { toast.className = 'hidden rounded-2xl p-3.5 border shadow-md transition-all'; toast.innerHTML = ''; }
-      const menu = clone.querySelector('#floatingActionMenu');
-      if (menu) menu.classList.add('hidden');
-      return '<!DOCTYPE html>\n' + clone.outerHTML;
-    }
-
-    function copyReleaseHtmlToClipboard() {
-      const htmlStr = buildStandaloneReleaseHtml();
-      const lineCount = htmlStr.split('\n').length;
-      const statusEl = document.getElementById('copyStatusBadge');
-      const finishCopy = () => {
-        if (statusEl) {
-          statusEl.textContent = `✅ Copied all ${lineCount.toLocaleString()} lines of index.html to clipboard!`;
-          statusEl.className = 'px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold';
-        }
-        const headerBtn = document.getElementById('publishHelperBtn');
-        if (headerBtn) {
-          headerBtn.innerHTML = '<span>✅ Copied HTML!</span>';
-        }
-      };
-      // Always run synchronous execCommand('copy') FIRST while user gesture is active in iframe!
-      const box = document.getElementById('exportRawCodeBox');
-      if (box) {
-        box.value = htmlStr;
-        box.focus();
-        box.select();
-        try {
-          if (document.execCommand('copy')) {
-            finishCopy();
-            return;
-          }
-        } catch (e) {}
+      // Update live collapsed toggle badge for Contract Audit Trail
+      const auditToggleBadge = document.getElementById('auditTrailToggleBadge');
+      if (auditToggleBadge) {
+        auditToggleBadge.textContent = `${app.auditEntries.length}`;
       }
-      fallbackCopy(htmlStr, finishCopy);
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(htmlStr).then(finishCopy).catch(() => {});
-      }
-    }
 
-    function fallbackCopy(text, cb) {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.left = '0';
-      ta.style.top = '0';
-      ta.style.opacity = '0.01';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      try { if (document.execCommand('copy')) cb(); } catch (e) {}
-      document.body.removeChild(ta);
-    }
-
-    function downloadReleaseHtmlFile() {
-      const htmlStr = buildStandaloneReleaseHtml();
-      const blob = new Blob([htmlStr], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'index.html';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
-
-    function openPublishModalAndCopy() {
-      const htmlStr = buildStandaloneReleaseHtml();
-      const lineCount = htmlStr.split('\n').length;
-      let modal = document.getElementById('publishHelperModal');
-      if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'publishHelperModal';
-        modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-4';
-        modal.innerHTML = `
-          <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-5 text-slate-100 shadow-2xl space-y-3.5">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
-              <div>
-                <h3 class="text-base font-extrabold text-white">🚀 Commit to <code class="text-emerald-300">macc-dev</code> or <code class="text-blue-300">main</code></h3>
-                <p class="text-xs text-slate-400">Full <code class="text-emerald-300">index.html</code> (${lineCount.toLocaleString()} lines)</p>
-              </div>
-              <button onclick="document.getElementById('publishHelperModal').remove()" class="text-slate-400 hover:text-white text-lg font-bold px-2 cursor-pointer">✕</button>
-            </div>
-            <div id="copyStatusBadge" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold">
-              ✅ All ${lineCount.toLocaleString()} lines selected &amp; copied below!
-            </div>
-            <div>
-              <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-                <span>Full HTML Code (Click box &amp; press <strong>Ctrl+C</strong> if needed):</span>
-                <span class="font-mono text-emerald-400">${lineCount.toLocaleString()} lines</span>
-              </div>
-              <textarea id="exportRawCodeBox" readonly onclick="this.select(); document.execCommand('copy');" class="w-full h-24 p-2 rounded-lg bg-slate-950 border border-slate-700 text-[10px] font-mono text-emerald-300 focus:outline-none"></textarea>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <button onclick="copyReleaseHtmlToClipboard()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer">
-                📋 Select &amp; Copy All ${lineCount.toLocaleString()} Lines
-              </button>
-              <a href="https://github.com/macc0311/fwpd-the-books/edit/macc-dev/index.html" target="_blank" rel="noopener" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs cursor-pointer inline-flex items-center gap-1">
-                ✏️ Edit on macc-dev ↗
-              </a>
-              <a href="https://github.com/macc0311/fwpd-the-books/edit/main/index.html" target="_blank" rel="noopener" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer border border-slate-700 inline-flex items-center gap-1">
-                ✏️ Edit on main ↗
-              </a>
-            </div>
-            <div class="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800">
-              <a href="https://github.com/macc0311/fwpd-the-books/compare/main...macc-dev" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-semibold">Compare &amp; Merge macc-dev → main ↗</a>
-              <button onclick="document.getElementById('publishHelperModal').remove()" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold cursor-pointer">Done</button>
-            </div>
-          </div>
-        `;
-        document.body.appendChild(modal);
-      }
-      copyReleaseHtmlToClipboard();
+      syncBottomDrawerUI();
     }
 
     initApp();

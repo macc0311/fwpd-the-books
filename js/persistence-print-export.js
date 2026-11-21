@@ -9,9 +9,14 @@
   const SCHEMA_VERSION = '3.0.0';
   let isRestoring = false;
   let lastSavedTimeStr = 'Just now';
+  const MAX_UNDO_STEPS = 20;
+  let undoStack = [];
+  let lastCommittedSnapshot = null;
+  let lastCommittedFingerprint = null;
+  let updatedFlashTimer = null;
 
   // =========================================================================
-  // 1. LOCALSTORAGE AUTO-SAVE & RESTORE ENGINE
+  // 1. STATE SNAPSHOT, UNDO HISTORY & SILENT PERSISTENCE ENGINE
   // =========================================================================
   function getFloatScopeValue() {
     const el = document.getElementById('floatScopeSelect');
@@ -57,20 +62,66 @@
     };
   }
 
-  function saveStateToStorage(customLabel) {
+  function getScheduleFingerprint(payload) {
+    return JSON.stringify({
+      selectedBureau: payload.selectedBureau,
+      selectedDate: payload.selectedDate,
+      selectedShift: payload.selectedShift,
+      shiftMin: payload.shiftMin,
+      floatScope: payload.floatScope,
+      command: payload.command,
+      officers: payload.officers,
+      dayOffRoster: payload.dayOffRoster,
+      offTimeSheet: payload.offTimeSheet,
+      hireBackOptInPes: payload.hireBackOptInPes,
+      hireBackNoticeMode: payload.hireBackNoticeMode,
+      hireBackBids: payload.hireBackBids,
+      shiftNotices: payload.shiftNotices,
+      floatedMoves: payload.floatedMoves,
+      auditEntries: payload.auditEntries,
+      hbEngine: payload.hbEngine
+    });
+  }
+
+  function resetUndoBaseline(payload) {
+    const snap = payload ? JSON.parse(JSON.stringify(payload)) : JSON.parse(JSON.stringify(serializeState()));
+    undoStack = [];
+    lastCommittedSnapshot = snap;
+    lastCommittedFingerprint = getScheduleFingerprint(snap);
+    updateUndoControl('idle');
+  }
+
+  function saveStateToStorage(options) {
     if (isRestoring) return;
+    const silentUndo = options && typeof options === 'object' && options.skipUndo === true;
+    const payload = serializeState();
+    const clonedPayload = JSON.parse(JSON.stringify(payload));
+    const fp = getScheduleFingerprint(clonedPayload);
+
+    if (!silentUndo) {
+      if (lastCommittedSnapshot === null) {
+        lastCommittedSnapshot = clonedPayload;
+        lastCommittedFingerprint = fp;
+      } else if (fp !== lastCommittedFingerprint) {
+        undoStack.push(lastCommittedSnapshot);
+        if (undoStack.length > MAX_UNDO_STEPS) {
+          undoStack.shift();
+        }
+        lastCommittedSnapshot = clonedPayload;
+        lastCommittedFingerprint = fp;
+        updateUndoControl('updated');
+      }
+    }
+
     try {
-      const payload = serializeState();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
       lastSavedTimeStr = new Date().toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
       });
-      updateSavedBadge(customLabel || '✓ Saved', `Auto-saved to browser storage at ${lastSavedTimeStr}`);
     } catch (err) {
-      console.warn('[FWPD Books] Could not save state to localStorage:', err);
-      updateSavedBadge('⚠ Storage Full', 'Browser localStorage is unavailable or full');
+      // Silently ignore when running in sandboxed previews or restricted storage contexts
     }
   }
 
@@ -161,7 +212,8 @@
       document.body.classList.toggle('dark-mode', app.darkMode);
       const themeBtn = document.getElementById('themeToggleBtn');
       if (themeBtn) {
-        themeBtn.textContent = app.darkMode ? '☀️ Light Mode' : '🌙 Dark Mode';
+        themeBtn.textContent = app.darkMode ? '☀️' : '🌙';
+        themeBtn.title = app.darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode';
       }
 
       if (typeof window.setViewMode === 'function') {
@@ -188,24 +240,78 @@
           ? new Date(parsed.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
           : 'earlier session';
         lastSavedTimeStr = savedTime;
-        updateSavedBadge('✓ Saved', `Restored schedule from ${savedTime}`);
+        resetUndoBaseline();
       }
       return ok;
     } catch (err) {
-      console.warn('[FWPD Books] Failed to restore state from localStorage:', err);
       return false;
     }
   }
 
-  function updateSavedBadge(text, tooltip) {
-    const badge = document.getElementById('persistenceStatusBadge');
-    if (!badge) return;
-    badge.textContent = text;
-    if (tooltip) badge.title = tooltip;
-    badge.classList.remove('save-badge-flash');
-    void badge.offsetWidth; // Reflow for animation restart
-    badge.classList.add('save-badge-flash');
+  function updateUndoControl(mode) {
+    const btn = document.getElementById('undoLastActionBtn');
+    if (!btn) return;
+
+    if (updatedFlashTimer) {
+      clearTimeout(updatedFlashTimer);
+      updatedFlashTimer = null;
+    }
+
+    const count = undoStack.length;
+    if (count === 0) {
+      if (mode === 'undone') {
+        btn.className = 'px-2.5 py-1.5 rounded-xl text-[11px] font-semibold bg-slate-800 text-slate-300 border border-slate-700 transition select-none cursor-default';
+        btn.disabled = true;
+        btn.textContent = '↺ Undone';
+        btn.title = 'Reverted to initial state';
+        updatedFlashTimer = setTimeout(() => {
+          btn.classList.add('hidden');
+        }, 1600);
+      } else {
+        btn.classList.add('hidden');
+        btn.disabled = true;
+      }
+      return;
+    }
+
+    btn.disabled = false;
+    const stepLabel = count === 1 ? '1 step' : `${count} steps`;
+
+    if (mode === 'updated') {
+      btn.className = 'px-2.5 py-1.5 rounded-xl text-[11px] font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 transition cursor-pointer inline-flex items-center gap-1.5';
+      btn.innerHTML = '<span>✓ Updated</span><span class="opacity-40">·</span><span class="underline underline-offset-2">↺ Undo</span>';
+      btn.title = `Schedule updated — click to undo last action (${stepLabel} available • Ctrl+Z)`;
+      updatedFlashTimer = setTimeout(() => {
+        updateUndoControl('idle');
+      }, 4500);
+    } else if (mode === 'undone') {
+      btn.className = 'px-2.5 py-1.5 rounded-xl text-[11px] font-semibold bg-blue-500/15 hover:bg-blue-500/25 text-blue-200 border border-blue-400/40 transition cursor-pointer inline-flex items-center gap-1.5';
+      btn.innerHTML = '<span>↺ Undone</span><span class="opacity-40">·</span><span class="underline underline-offset-2">Undo Again</span>';
+      btn.title = `Reverted last action (${stepLabel} remaining • Ctrl+Z)`;
+      updatedFlashTimer = setTimeout(() => {
+        updateUndoControl('idle');
+      }, 2200);
+    } else {
+      btn.className = 'px-2.5 py-1.5 rounded-xl text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer inline-flex items-center gap-1';
+      btn.textContent = '↺ Undo';
+      btn.title = `Undo last action (${stepLabel} available • Ctrl+Z)`;
+    }
   }
+
+  function undoLastAction() {
+    if (undoStack.length === 0) return;
+    const prevSnapshot = undoStack.pop();
+    if (!prevSnapshot) return;
+
+    const ok = applyStatePayload(prevSnapshot);
+    if (ok) {
+      lastCommittedSnapshot = JSON.parse(JSON.stringify(prevSnapshot));
+      lastCommittedFingerprint = getScheduleFingerprint(lastCommittedSnapshot);
+      saveStateToStorage({ skipUndo: true });
+      updateUndoControl('undone');
+    }
+  }
+  window.undoLastAction = undoLastAction;
 
   // =========================================================================
   // 2. ROLL-CALL PRINT SHEET ENGINE (Single-Page US Letter Landscape)
@@ -597,12 +703,190 @@
   }
 
   // =========================================================================
-  // 4. UI INJECTION INTO TOP NAVBAR & HOOKS
+  // 4. ADMINISTRATOR CONTROLS (COMMAND-ONLY SHIFT MINIMUM) & NAVBAR HOOKS
   // =========================================================================
+  function isCommandMode() {
+    return typeof app !== 'undefined' && app.loggedInPe === 'COD';
+  }
+
+  function syncAdminMenuState() {
+    const btn = document.getElementById('menuAdminShiftMinBtn');
+    const tag = document.getElementById('menuAdminShiftMinTag');
+    if (!btn || !tag) return;
+    const isCmd = isCommandMode();
+    const minVal = typeof app !== 'undefined' && typeof app.shiftMin === 'number' ? app.shiftMin : 32;
+    if (isCmd) {
+      btn.disabled = false;
+      btn.classList.remove('opacity-45', 'cursor-not-allowed');
+      btn.title = 'Command authorization: explicitly change the shift minimum count';
+      tag.textContent = `Min ${minVal}`;
+      tag.className = 'backup-menu-tag !bg-amber-500/20 !text-amber-300';
+    } else {
+      btn.disabled = true;
+      btn.classList.add('opacity-45', 'cursor-not-allowed');
+      btn.title = 'Command Only — switch User to Supervisor / COD Mode to adjust Shift Minimum';
+      tag.textContent = '🔒 Command';
+      tag.className = 'backup-menu-tag';
+    }
+  }
+
+  function closeAdminShiftMinModal() {
+    const modal = document.getElementById('adminShiftMinModal');
+    if (modal) modal.remove();
+  }
+
+  function openAdminShiftMinModal() {
+    closeBackupDropdown();
+    if (!isCommandMode()) return;
+
+    closeAdminShiftMinModal();
+
+    const currentCount = typeof window.getShiftCount === 'function' ? window.getShiftCount() : 0;
+    const currentMin = app.shiftMin;
+    let draftMin = currentMin;
+
+    const modal = document.createElement('div');
+    modal.id = 'adminShiftMinModal';
+    modal.className = 'fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-4';
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeAdminShiftMinModal();
+    });
+
+    modal.innerHTML = `
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 text-slate-100 shadow-2xl space-y-4">
+        <div class="flex items-start justify-between border-b border-slate-800 pb-3">
+          <div>
+            <div class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-300 mb-1">
+              <span>🛡️ Command Administration</span>
+            </div>
+            <h3 class="text-base font-extrabold text-white">Adjust Shift Minimum Count</h3>
+            <p class="text-[11px] text-slate-400 mt-0.5">Explicit Command override for ${app.selectedShift || 'A'}-Shift (${app.selectedDate || ''})</p>
+          </div>
+          <button type="button" id="adminMinCloseBtn" class="text-slate-400 hover:text-white text-lg font-bold px-1.5 cursor-pointer" title="Close">✕</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5 text-center">
+          <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-2.5">
+            <div class="text-[10px] uppercase tracking-wider text-slate-400">Current Count</div>
+            <div class="text-xl font-mono font-extrabold text-white mt-0.5">${currentCount}</div>
+          </div>
+          <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-2.5">
+            <div class="text-[10px] uppercase tracking-wider text-slate-400">Current Minimum</div>
+            <div class="text-xl font-mono font-extrabold text-amber-300 mt-0.5">${currentMin}</div>
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="adminMinInput" class="block text-xs font-semibold text-slate-300">New Shift Minimum</label>
+          <div class="flex items-center gap-2">
+            <button type="button" id="adminMinDecBtn" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-lg cursor-pointer">−</button>
+            <input
+              id="adminMinInput"
+              type="number"
+              min="1"
+              max="99"
+              value="${currentMin}"
+              class="flex-1 h-10 rounded-xl bg-slate-950 border border-slate-700 text-center font-mono font-extrabold text-lg text-white focus:outline-none focus:border-amber-400"
+            />
+            <button type="button" id="adminMinIncBtn" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-lg cursor-pointer">+</button>
+          </div>
+          <div id="adminMinImpactNote" class="text-[11px] font-medium pt-1"></div>
+        </div>
+
+        <div class="space-y-1">
+          <label for="adminMinReasonInput" class="block text-xs font-semibold text-slate-300">Command Reason (optional)</label>
+          <input
+            id="adminMinReasonInput"
+            type="text"
+            placeholder="e.g., Special event staffing directive"
+            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+          />
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" id="adminMinCancelBtn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer">
+            Cancel
+          </button>
+          <button type="button" id="adminMinApplyBtn" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold cursor-pointer transition">
+            Confirm Shift Minimum
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const inputEl = document.getElementById('adminMinInput');
+    const impactEl = document.getElementById('adminMinImpactNote');
+    const applyBtn = document.getElementById('adminMinApplyBtn');
+    const reasonEl = document.getElementById('adminMinReasonInput');
+
+    function updatePreview() {
+      const parsed = parseInt(inputEl.value, 10);
+      draftMin = Number.isFinite(parsed) ? Math.max(1, Math.min(99, parsed)) : currentMin;
+      const diff = currentCount - draftMin;
+      if (draftMin === currentMin) {
+        impactEl.className = 'text-[11px] font-medium pt-1 text-slate-400';
+        impactEl.textContent = 'No change from current shift minimum.';
+        applyBtn.disabled = true;
+        applyBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      } else {
+        applyBtn.disabled = false;
+        applyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        if (diff > 0) {
+          impactEl.className = 'text-[11px] font-semibold pt-1 text-emerald-300';
+          impactEl.textContent = `Impact: ${currentCount}/${draftMin} — ${diff} above minimum (${diff} open leave ${diff === 1 ? 'slot' : 'slots'}).`;
+        } else if (diff === 0) {
+          impactEl.className = 'text-[11px] font-semibold pt-1 text-amber-300';
+          impactEl.textContent = `Impact: ${currentCount}/${draftMin} — At exact minimum count.`;
+        } else {
+          impactEl.className = 'text-[11px] font-semibold pt-1 text-red-300';
+          impactEl.textContent = `Impact: ${currentCount}/${draftMin} — ${Math.abs(diff)} below minimum (triggers automated Hire-Back).`;
+        }
+      }
+    }
+
+    document.getElementById('adminMinDecBtn').addEventListener('click', function () {
+      inputEl.value = String(Math.max(1, (parseInt(inputEl.value, 10) || currentMin) - 1));
+      updatePreview();
+    });
+    document.getElementById('adminMinIncBtn').addEventListener('click', function () {
+      inputEl.value = String(Math.min(99, (parseInt(inputEl.value, 10) || currentMin) + 1));
+      updatePreview();
+    });
+    inputEl.addEventListener('input', updatePreview);
+    document.getElementById('adminMinCloseBtn').addEventListener('click', closeAdminShiftMinModal);
+    document.getElementById('adminMinCancelBtn').addEventListener('click', closeAdminShiftMinModal);
+
+    applyBtn.addEventListener('click', function () {
+      if (draftMin === currentMin) return;
+      const reason = (reasonEl.value || '').trim();
+      const prevMin = app.shiftMin;
+      app.shiftMin = draftMin;
+      if (Array.isArray(app.auditEntries)) {
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        app.auditEntries.unshift({
+          time: timeStr,
+          tag: 'COMMAND ADMIN',
+          msg: `Command updated ${app.selectedShift || 'A'}-Shift minimum from ${prevMin} to ${draftMin}${reason ? ` (${reason})` : ''}.`
+        });
+      }
+      closeAdminShiftMinModal();
+      if (typeof window.recalculateFloats === 'function') {
+        window.recalculateFloats();
+      } else if (typeof window.renderAll === 'function') {
+        window.renderAll();
+      }
+    });
+
+    updatePreview();
+  }
+
   function toggleBackupDropdown(event) {
     if (event) event.stopPropagation();
     const menu = document.getElementById('backupExportMenu');
     if (!menu) return;
+    syncAdminMenuState();
     menu.classList.toggle('hidden');
   }
 
@@ -613,37 +897,48 @@
 
   function injectNavbarControls() {
     const resetBtn = document.querySelector('button[onclick="resetSchedule()"]');
-    if (!resetBtn || document.getElementById('printRollCallBtn')) return;
+    if (!resetBtn || document.getElementById('backupExportDropdownWrap')) return;
 
     const parentBar = resetBtn.parentElement;
+    const cornerUtils = document.getElementById('headerCornerUtils') || resetBtn.closest('header') || parentBar;
 
-    // 1. Subtle "✓ Saved" Auto-Persistence Indicator Badge
-    const savedBadge = document.createElement('span');
-    savedBadge.id = 'persistenceStatusBadge';
-    savedBadge.className = 'px-2.5 py-1.5 rounded-xl text-[11px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 select-none';
-    savedBadge.title = 'Changes auto-save to browser localStorage';
-    savedBadge.textContent = '✓ Saved';
+    // 1. Contextual "✓ Updated · ↺ Undo" / "↺ Undo" Control (Hidden at rest until a change occurs)
+    const undoBtn = document.createElement('button');
+    undoBtn.id = 'undoLastActionBtn';
+    undoBtn.type = 'button';
+    undoBtn.className = 'hidden px-2.5 py-1.5 rounded-xl text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer';
+    undoBtn.title = 'Undo last schedule change (Ctrl+Z)';
+    undoBtn.textContent = '↺ Undo';
+    undoBtn.addEventListener('click', undoLastAction);
 
-    // 2. "🖨️ Print" Button
-    const printBtn = document.createElement('button');
-    printBtn.id = 'printRollCallBtn';
-    printBtn.type = 'button';
-    printBtn.className = 'px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer';
-    printBtn.title = 'Open 1-page US Letter Landscape Roll-Call Print Preview';
-    printBtn.innerHTML = '🖨️ Print';
-    printBtn.addEventListener('click', triggerRollCallPrint);
-
-    // 3. "💾 Backup / Export ▾" Dropdown Button + Menu
+    // 2. Compact Settings Cog Dropdown (Print, Backup, Export & Command Admin) inside lower-right utility cluster
     const dropdownWrap = document.createElement('div');
     dropdownWrap.id = 'backupExportDropdownWrap';
     dropdownWrap.className = 'backup-dropdown-wrap';
     dropdownWrap.innerHTML = `
-      <button id="backupExportBtn" type="button" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/30 shadow-xs transition cursor-pointer">
-        💾 Backup / Export ▾
+      <button
+        id="backupExportBtn"
+        type="button"
+        aria-label="Settings, Print &amp; Export Menu"
+        title="Settings, Print &amp; Administration"
+        class="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700/80 flex items-center justify-center transition cursor-pointer"
+      >
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
       </button>
       <div id="backupExportMenu" class="backup-dropdown-menu hidden" onclick="event.stopPropagation()">
-        <div class="px-2.5 py-1.5 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-          Roll-Call &amp; Schedule Data
+        <div class="px-2.5 py-1.5 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+          Administrators (Command)
+        </div>
+        <button type="button" id="menuAdminShiftMinBtn" class="backup-menu-item mt-1">
+          <span>🛡️ Adjust Shift Minimum</span>
+          <span id="menuAdminShiftMinTag" class="backup-menu-tag">Min 32</span>
+        </button>
+        <div class="my-1 border-t border-slate-800"></div>
+        <div class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          Print &amp; Schedule Backups
         </div>
         <button type="button" id="menuPrintSheetBtn" class="backup-menu-item mt-1">
           <span>🖨️ Print Roll-Call Sheet</span>
@@ -673,11 +968,11 @@
       <input type="file" id="scheduleJsonFileInput" accept=".json,application/json" class="hidden" />
     `;
 
-    parentBar.insertBefore(savedBadge, resetBtn);
-    parentBar.insertBefore(printBtn, resetBtn);
-    parentBar.insertBefore(dropdownWrap, resetBtn);
+    parentBar.insertBefore(undoBtn, resetBtn);
+    cornerUtils.appendChild(dropdownWrap);
 
     document.getElementById('backupExportBtn').addEventListener('click', toggleBackupDropdown);
+    document.getElementById('menuAdminShiftMinBtn').addEventListener('click', openAdminShiftMinModal);
     document.getElementById('menuPrintSheetBtn').addEventListener('click', triggerRollCallPrint);
     document.getElementById('menuExportJsonBtn').addEventListener('click', exportScheduleJson);
     document.getElementById('menuImportJsonBtn').addEventListener('click', triggerImportJsonPicker);
@@ -688,15 +983,30 @@
     document.addEventListener('click', function () {
       closeBackupDropdown();
     });
+
+    // Keyboard shortcut: Ctrl+Z / Cmd+Z to undo last schedule action (when not typing in a field)
+    document.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && String(e.key).toLowerCase() === 'z') {
+        const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select' || (document.activeElement && document.activeElement.isContentEditable)) {
+          return;
+        }
+        if (undoStack.length > 0) {
+          e.preventDefault();
+          undoLastAction();
+        }
+      }
+    });
   }
 
   function hookGlobalFunctions() {
-    // Wrap renderAll so every state change updates the print footer and auto-saves to localStorage
+    // Wrap renderAll so every state change updates the print footer, admin menu state, and records undo/persistence
     const origRenderAll = window.renderAll;
     if (typeof origRenderAll === 'function') {
       window.renderAll = function () {
         origRenderAll.apply(this, arguments);
         updatePrintFooter();
+        syncAdminMenuState();
         saveStateToStorage();
       };
     }
@@ -706,7 +1016,7 @@
     if (typeof origToggleTheme === 'function') {
       window.toggleTheme = function () {
         origToggleTheme.apply(this, arguments);
-        saveStateToStorage();
+        saveStateToStorage({ skipUndo: true });
       };
     }
 
@@ -715,7 +1025,7 @@
     if (typeof origSetViewMode === 'function') {
       window.setViewMode = function () {
         origSetViewMode.apply(this, arguments);
-        saveStateToStorage();
+        saveStateToStorage({ skipUndo: true });
       };
     }
 
@@ -738,7 +1048,7 @@
       };
     }
 
-    // Wrap resetSchedule so clicking "↺ Reset" clears localStorage back to factory defaults
+    // Wrap resetSchedule so clicking "↺ Reset" clears localStorage and undo stack back to factory defaults
     const origResetSchedule = window.resetSchedule;
     if (typeof origResetSchedule === 'function') {
       window.resetSchedule = function () {
@@ -756,17 +1066,7 @@
         try {
           localStorage.removeItem(STORAGE_KEY);
         } catch (e) {}
-        updateSavedBadge('↺ Reset to Default', 'Cleared saved browser state and restored factory schedule');
-      };
-    }
-
-    // Ensure standalone HTML export closes our dropdown cleanly if used
-    const origBuildStandalone = window.buildStandaloneReleaseHtml;
-    if (typeof origBuildStandalone === 'function') {
-      window.buildStandaloneReleaseHtml = function () {
-        closeBackupDropdown();
-        exitRollCallPrintPreview();
-        return origBuildStandalone.apply(this, arguments);
+        resetUndoBaseline();
       };
     }
   }
@@ -779,7 +1079,8 @@
     const restored = restoreStateFromStorage();
     if (!restored) {
       updatePrintFooter();
-      saveStateToStorage('✓ Saved');
+      resetUndoBaseline();
+      saveStateToStorage({ skipUndo: true });
     }
   }
 
