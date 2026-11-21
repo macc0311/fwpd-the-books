@@ -1521,24 +1521,20 @@
     const details = getNoticeModeDetails();
     const supAudit = auditSupervisorMinimums();
     const openPostings = eng.openPostings;
-    const openCount = openPostings.length;
-    const standbyCount = eng.supervisorStandbyList.length;
     const recentCanceled = eng.closedNotifications.filter(n => n.recordType === 'CANCELED').slice(0, 1);
 
-    const qBadges = DIV_KEYS.map(d => {
-      const c = supAudit.quadrantSgts[d] || 0;
-      const ok = c >= 1;
-      return `<span class="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${ok ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/25 text-red-300 border border-red-500/40 animate-pulse'}">${d}: ${c} Sgt</span>`;
-    }).join('');
+    if (openPostings.length === 0 && recentCanceled.length === 0) {
+      strip.classList.add('hidden');
+      strip.innerHTML = '';
+      return;
+    }
 
-    const codBadge = supAudit.actingCod
-      ? `<span class="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-extrabold text-[10.5px]">⚡ ACTING COD: ${supAudit.actingCod.name} (#${supAudit.actingCod.pe}) [FOPLC Art. 25]</span>`
-      : `<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-200 border border-blue-500/30 font-semibold text-[10.5px]">COD: ${supAudit.ltCount} LT / ${supAudit.sgtCount} SGT On Duty</span>`;
+    strip.classList.remove('hidden');
 
     let topLiveCountdownsHtml = '';
     if (openPostings.length > 0) {
       topLiveCountdownsHtml = `
-        <div class="mt-2.5 pt-2.5 border-t border-blue-500/40 space-y-2">
+        <div class="space-y-2">
           ${openPostings.map(p => {
             if (p.category === 'OFFICER') syncAppHireBackBidsIntoPosting(p);
             const sortedBids = sortBidsForPosting(p.bids, p);
@@ -1607,7 +1603,7 @@
     } else if (recentCanceled.length > 0) {
       const c = recentCanceled[0];
       topLiveCountdownsHtml = `
-        <div class="mt-2.5 pt-2.5 border-t border-red-500/40">
+        <div>
           <div class="p-3 rounded-xl bg-red-950/90 border-2 border-red-500/80 space-y-1.5 shadow-xl">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div class="flex items-center gap-2">
@@ -1642,61 +1638,7 @@
       `;
     }
 
-    strip.innerHTML = `
-      <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-2.5">
-        <div class="flex flex-wrap items-center gap-2">
-          <div class="flex items-center gap-1.5 pr-1">
-            <span class="w-2.5 h-2.5 rounded-full ${openCount > 0 ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'}"></span>
-            <span class="text-xs font-extrabold tracking-tight text-white uppercase">Zero-Touch Hire-Back Engine:</span>
-          </div>
-
-          <button type="button" onclick="setHbNoticeMode('ADVANCE_24PLUS')" class="hb-mode-pill ${details.mode === 'ADVANCE_24PLUS' ? 'active-24plus' : 'inactive'}" title="Outside 24 Hours before shift start: Collects bids and auto-awards to highest seniority (lowest PE# with Uniform priority) when window expires">
-            <span>🕒 ≥ 24h Notice</span>
-            <span class="opacity-80 font-normal">(12s Bid Window → Seniority)</span>
-          </button>
-
-          <button type="button" onclick="setHbNoticeMode('SHORT_UNDER24')" class="hb-mode-pill ${details.mode === 'SHORT_UNDER24' ? 'active-under24' : 'inactive'}" title="Inside 24 Hours before shift start: Broadcasts via Radio/MDC/App and auto-populates First-Come, First-Served (includes DB & Exempt)">
-            <span>⚡ &lt; 24h Short Notice</span>
-            <span class="opacity-80 font-normal">(0 Bids → 1st Bidder Wins FCFS)</span>
-          </button>
-
-          <button type="button" onclick="setHbNoticeMode('SHIFT_STARTED')" class="hb-mode-pill ${details.mode === 'SHIFT_STARTED' ? 'active-started' : 'inactive'}" title="Shift already started: FOPLC Art. 24 §4D freezes hire-backs unless Duty Chief authorizes">
-            <span>🔒 Shift Started</span>
-            <span class="opacity-80 font-normal">(Duty Chief Gate)</span>
-          </button>
-
-          ${details.mode === 'SHIFT_STARTED' ? `
-            <button type="button" onclick="toggleDutyChiefAuth()" class="px-2.5 py-1 rounded-lg text-[10.5px] font-bold cursor-pointer transition ${eng.dutyChiefAuthorized ? 'bg-emerald-600 text-white' : 'bg-red-600/80 hover:bg-red-500 text-white'}">
-              ${eng.dutyChiefAuthorized ? '✓ Duty Chief Authorized' : '🛡️ Authorize via Duty Chief'}
-            </button>
-          ` : ''}
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2 text-xs">
-          ${codBadge}
-          <div class="flex items-center gap-1" title="FOPLC Art. 24 §2B: Minimum 1 Uniform Sergeant per Quadrant (4 total)">
-            ${qBadges}
-          </div>
-          ${standbyCount > 0 ? `
-            <span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-400/30 font-mono text-[10px]" title="FOPLC Art. 24 §4B Seniority Standby List">
-              📋 Supv Standby: ${standbyCount}
-            </span>
-          ` : ''}
-        </div>
-      </div>
-
-      <div class="mt-1.5 pt-1.5 border-t border-slate-800/90 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-300">
-        <div>
-          <strong class="text-blue-300">${details.contractCite}:</strong>
-          <span>${details.ruleSummary}</span>
-        </div>
-        <div class="flex items-center gap-3 text-[10.5px] text-slate-400 font-mono">
-          <span>Sim Clock: <strong class="text-slate-200">${details.simClockNote}</strong></span>
-        </div>
-      </div>
-
-      ${topLiveCountdownsHtml}
-    `;
+    strip.innerHTML = topLiveCountdownsHtml;
   }
 
   function renderEnhancedCommandRows() {

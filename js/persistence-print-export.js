@@ -49,6 +49,7 @@
       hireBackBids: Array.isArray(app.hireBackBids) ? app.hireBackBids : [],
       hireBackBidCounter: app.hireBackBidCounter || 1,
       hireBackLastWinnerNotification: app.hireBackLastWinnerNotification || null,
+      shiftNotices: Array.isArray(app.shiftNotices) ? app.shiftNotices : [],
       floatedMoves: app.floatedMoves,
       auditEntries: app.auditEntries,
       savedHistory: app.savedHistory || {},
@@ -96,6 +97,9 @@
       }
       if (data.savedHistory && typeof data.savedHistory === 'object') {
         app.savedHistory = JSON.parse(JSON.stringify(data.savedHistory));
+      }
+      if (Array.isArray(data.shiftNotices)) {
+        app.shiftNotices = JSON.parse(JSON.stringify(data.shiftNotices));
       }
       if (data.hbEngine && typeof data.hbEngine === 'object') {
         app.hbEngine = JSON.parse(JSON.stringify(data.hbEngine));

@@ -4,8 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FWPD "The Books" — Modern Shift & Seniority Scheduling Platform</title>
-  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="js/tailwindcss.min.js"></script>
   <style>
     :root {
       --bg-app: #f1f5f9;
@@ -361,10 +360,11 @@
                 <button onclick="setMinForVacationDemo()" class="ml-1 px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-[10px] font-semibold transition cursor-pointer" title="Sets Shift Minimum to 31 so Shift Count 32 has 1 open Vacation/Day-Off slot">
                   Open 1 Leave Slot (Min 31)
                 </button>
-                <button onclick="openHireBackPopover(event)" class="ml-0.5 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 rounded-md text-[10px] font-bold transition cursor-pointer" title="Assign an officer from another shift (B/C-Shift) or off-time to work a Hire-Back on this shift">
-                  ⚡ Cross-Shift Hire-Back ▾
-                </button>
               </div>
+
+              <button type="button" onclick="openAddShiftNoticePopover(event)" class="px-2.5 py-1 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] hover:bg-amber-500/10 text-[var(--text-main)] text-[11px] font-semibold transition cursor-pointer flex items-center gap-1" title="Broadcast a Guard Duty, Detail, Special Event, or Shift Alert">
+                <span>+ Notice</span>
+              </button>
             </div>
 
             <!-- Center: Official FWPD Schedule Title -->
@@ -394,6 +394,9 @@
             </div>
 
           </div>
+
+          <!-- SHIFT NOTICES & SPECIAL ASSIGNMENTS STRIP -->
+          <div id="shiftNoticesBar" class="hidden px-4 py-2.5 border-b border-[var(--border-strong)] bg-[var(--bg-surface)]"></div>
 
           <!-- 4-DIVISION SPREADSHEET GRID -->
           <div class="overflow-x-auto">
@@ -4905,8 +4908,7 @@
           "bidCar": false,
           "name": "CAMPO, B",
           "pe": 2094,
-          "assign": "*0200-0400",
-          "highlight": true
+          "assign": ""
         },
         {
           "unit": "J373",
@@ -5026,8 +5028,7 @@
           "name": "PEASE, B",
           "pe": 2118,
           "partner": "C192",
-          "assign": "*0400-0600",
-          "highlight": true
+          "assign": ""
         },
         {
           "unit": "I392",
@@ -5291,8 +5292,7 @@
           "name": "TAYLOR, I",
           "pe": 2110,
           "partner": "D91",
-          "assign": "*0000-0200",
-          "highlight": true
+          "assign": ""
         },
         {
           "unit": "M496",
@@ -10264,6 +10264,7 @@
       hireBackBids: [],
       hireBackBidCounter: 0,
       hireBackLastWinnerNotification: null,
+      shiftNotices: [],
       savedHistory: {} // Keyed by `${selectedBureau}_${selectedDate}_${selectedShift}` for persistent historical reflection!
     };
 
@@ -10355,6 +10356,7 @@
         hireBackBids: clone(app.hireBackBids),
         hireBackBidCounter: app.hireBackBidCounter,
         hireBackLastWinnerNotification: clone(app.hireBackLastWinnerNotification),
+        shiftNotices: clone(app.shiftNotices || []),
         auditEntries: clone(app.auditEntries)
       };
     }
@@ -10427,6 +10429,7 @@
         app.hireBackBids = clone(saved.hireBackBids || []);
         app.hireBackBidCounter = saved.hireBackBidCounter || 0;
         app.hireBackLastWinnerNotification = clone(saved.hireBackLastWinnerNotification || null);
+        app.shiftNotices = clone(saved.shiftNotices || []);
         app.auditEntries = clone(saved.auditEntries);
       } else {
         app.shiftMin = tmpl.shiftMin;
@@ -10451,6 +10454,31 @@
         app.hireBackBids = [];
         app.hireBackBidCounter = 0;
         app.hireBackLastWinnerNotification = null;
+        app.shiftNotices = clone(tmpl.shiftNotices || []);
+        if (app.shiftNotices.length === 0) {
+          if (tmpl.guardDutyNote) {
+            app.shiftNotices.push({
+              id: 'notice_gd_1',
+              type: 'GUARD_DUTY',
+              text: tmpl.guardDutyNote,
+              assignedUnit: '',
+              assignedDiv: '',
+              assignedName: '',
+              assignedPe: null
+            });
+          }
+          if (tmpl.specialAlert) {
+            app.shiftNotices.push({
+              id: 'notice_alert_1',
+              type: 'ALERT',
+              text: tmpl.specialAlert,
+              assignedUnit: '',
+              assignedDiv: '',
+              assignedName: '',
+              assignedPe: null
+            });
+          }
+        }
         const longDate = formatLongDate(app.selectedDate);
         const isPast = app.selectedDate < '2026-11-15';
         app.auditEntries = [
@@ -11913,23 +11941,10 @@
         hlEl.innerHTML = `${titlePrefix} • <span class="font-semibold">${longDateStr}</span>`;
       }
       const gdEl = document.getElementById('paperGuardDutyBanner');
-      if (gdEl) {
-        if (sched.guardDutyNote) {
-          gdEl.textContent = sched.guardDutyNote;
-          gdEl.classList.remove('hidden');
-        } else {
-          gdEl.classList.add('hidden');
-        }
-      }
+      if (gdEl) gdEl.classList.add('hidden');
       const saEl = document.getElementById('paperSpecialAlertBanner');
-      if (saEl) {
-        if (sched.specialAlert) {
-          saEl.textContent = sched.specialAlert;
-          saEl.classList.remove('hidden');
-        } else {
-          saEl.classList.add('hidden');
-        }
-      }
+      if (saEl) saEl.classList.add('hidden');
+      renderShiftNoticesBar();
       const mobBadge = document.getElementById('mobileAppShiftBadge');
       if (mobBadge) {
         mobBadge.textContent = `${app.selectedShift}-Shift • ${shortDateStr}`;
@@ -11946,6 +11961,237 @@
       renderPaperScheduledOffTimeRows();
       renderMobileAppCompanion(count, min);
       renderBottomPanels(count, min);
+    }
+
+    function getShiftNoticeStyle(type) {
+      const map = {
+        GUARD_DUTY: {
+          label: 'GUARD DUTY',
+          code: 'GD',
+          wrapCls: 'bg-amber-500/10 border-amber-500/40 text-amber-900 dark:text-amber-200',
+          badgeCls: 'text-amber-700 dark:text-amber-300'
+        },
+        DETAIL: {
+          label: 'DETAIL',
+          code: 'DETAIL',
+          wrapCls: 'bg-blue-500/10 border-blue-500/40 text-blue-900 dark:text-blue-200',
+          badgeCls: 'text-blue-700 dark:text-blue-300'
+        },
+        SPECIAL_EVENT: {
+          label: 'SPECIAL EVENT',
+          code: 'SE',
+          wrapCls: 'bg-purple-500/10 border-purple-500/40 text-purple-900 dark:text-purple-200',
+          badgeCls: 'text-purple-700 dark:text-purple-300'
+        },
+        ALERT: {
+          label: 'SHIFT ALERT',
+          code: '',
+          wrapCls: 'bg-red-500/10 border-red-500/40 text-red-900 dark:text-red-200',
+          badgeCls: 'text-red-700 dark:text-red-300'
+        }
+      };
+      return map[type] || map.DETAIL;
+    }
+
+    function renderShiftNoticesBar() {
+      const bar = document.getElementById('shiftNoticesBar');
+      if (!bar) return;
+      const notices = app.shiftNotices || [];
+      if (notices.length === 0) {
+        bar.classList.add('hidden');
+        bar.innerHTML = '';
+        return;
+      }
+
+      bar.classList.remove('hidden');
+      bar.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+            Shift Notices &amp; Special Assignments
+          </span>
+          <button type="button" onclick="openAddShiftNoticePopover(event)" class="px-2 py-0.5 rounded-md border border-[var(--border-strong)] bg-[var(--bg-subtle)] hover:bg-amber-500/10 text-[var(--text-main)] text-[10.5px] font-semibold transition cursor-pointer">
+            + Add Notice
+          </button>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          ${notices.map(n => {
+            const st = getShiftNoticeStyle(n.type);
+            const assignPill = n.type === 'ALERT'
+              ? ''
+              : (n.assignedUnit
+                  ? `<button type="button" onclick="openAssignNoticeOfficerPopover(event, '${n.id}')" class="px-2 py-0.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-[10.5px] transition cursor-pointer shrink-0" title="Reassign or clear ${n.assignedName}">
+                      ${n.assignedUnit} ${n.assignedName ? n.assignedName.split(',')[0] : ''}
+                    </button>`
+                  : `<button type="button" onclick="openAssignNoticeOfficerPopover(event, '${n.id}')" class="px-2 py-0.5 rounded-md bg-[var(--bg-surface)] hover:bg-blue-500/15 border border-[var(--border-strong)] text-[var(--text-main)] font-semibold text-[10.5px] transition cursor-pointer shrink-0">
+                      + Assign
+                    </button>`);
+            return `
+              <div class="flex items-center justify-between gap-3 px-3 py-1.5 rounded-xl border ${st.wrapCls} min-w-[260px] flex-1 max-w-full">
+                <div class="min-w-0">
+                  <div class="text-[9.5px] font-extrabold uppercase tracking-wider ${st.badgeCls}">${st.label}</div>
+                  <div class="text-xs font-semibold truncate" title="${n.text}">${n.text}</div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  ${assignPill}
+                  <button type="button" onclick="removeShiftNotice('${n.id}')" class="w-5 h-5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-main)] text-xs font-bold flex items-center justify-center transition cursor-pointer" title="Dismiss notice">✕</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function openAddShiftNoticePopover(event) {
+      event.stopPropagation();
+      const menu = document.getElementById('floatingActionMenu');
+      const content = document.getElementById('floatingMenuContent');
+      content.innerHTML = `
+        <div class="px-3 py-2 border-b border-[var(--border-grid)] flex items-center justify-between">
+          <span class="text-xs font-bold text-[var(--text-main)]">Add Shift Notice</span>
+          <button type="button" onclick="closeActionPopover()" class="text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer">✕</button>
+        </div>
+        <div class="p-3 space-y-2.5 text-xs">
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-[var(--text-muted)] mb-1">Type</label>
+            <select id="newNoticeTypeSelect" class="w-full px-2 py-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] text-[var(--text-main)] font-semibold text-xs">
+              <option value="GUARD_DUTY">Guard Duty</option>
+              <option value="DETAIL">Detail / Watch</option>
+              <option value="SPECIAL_EVENT">Special Event</option>
+              <option value="ALERT">Shift Alert</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-[var(--text-muted)] mb-1">Location / Case / Details</label>
+            <input id="newNoticeTextInput" type="text" placeholder="e.g. Lutheran DT • 26F129820 • Rm 6" class="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] text-[var(--text-main)] text-xs focus:outline-none" />
+          </div>
+          <button type="button" onclick="submitNewShiftNotice()" class="w-full py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition cursor-pointer">
+            Broadcast to Shift
+          </button>
+        </div>
+      `;
+      menu.classList.remove('hidden');
+      positionPopoverNearEvent(event, menu);
+      setTimeout(() => document.getElementById('newNoticeTextInput')?.focus(), 20);
+    }
+
+    function submitNewShiftNotice() {
+      const type = document.getElementById('newNoticeTypeSelect')?.value || 'GUARD_DUTY';
+      const text = (document.getElementById('newNoticeTextInput')?.value || '').trim();
+      if (!text) return;
+      app.shiftNotices = app.shiftNotices || [];
+      app.shiftNotices.push({
+        id: 'notice_' + Date.now(),
+        type,
+        text,
+        assignedUnit: '',
+        assignedDiv: '',
+        assignedName: '',
+        assignedPe: null
+      });
+      app.auditEntries.unshift({
+        time: new Date().toTimeString().slice(0, 5),
+        msg: `Broadcast ${getShiftNoticeStyle(type).label}: ${text}`,
+        tag: 'Shift Notice'
+      });
+      closeActionPopover();
+      renderAll();
+    }
+
+    function openAssignNoticeOfficerPopover(event, noticeId) {
+      event.stopPropagation();
+      const notice = (app.shiftNotices || []).find(n => n.id === noticeId);
+      if (!notice) return;
+      const onDuty = [];
+      for (const div of DIV_KEYS) {
+        for (const r of (app.officers[div] || [])) {
+          if (r.name && r.pe !== null) {
+            onDuty.push({ div, unit: r.unit, name: r.name, pe: r.pe });
+          }
+        }
+      }
+      const menu = document.getElementById('floatingActionMenu');
+      const content = document.getElementById('floatingMenuContent');
+      content.innerHTML = `
+        <div class="px-3 py-2 border-b border-[var(--border-grid)] flex items-center justify-between">
+          <span class="text-xs font-bold text-[var(--text-main)]">Assign Unit</span>
+          <button type="button" onclick="closeActionPopover()" class="text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer">✕</button>
+        </div>
+        ${notice.assignedUnit ? `
+          <div class="p-2 border-b border-[var(--border-grid)]">
+            <button type="button" onclick="unassignOfficerFromShiftNotice('${notice.id}')" class="w-full py-1 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-600 dark:text-red-300 font-bold text-[11px] cursor-pointer">
+              Clear Assignment (${notice.assignedUnit})
+            </button>
+          </div>
+        ` : ''}
+        <div class="max-h-56 overflow-y-auto p-1.5 space-y-0.5 text-xs">
+          ${onDuty.map(o => `
+            <button type="button" onclick="assignOfficerToShiftNotice('${notice.id}', '${o.div}', '${o.unit}', ${o.pe})" class="w-full text-left px-2 py-1 rounded-md hover:bg-blue-500/15 flex items-center justify-between gap-2 cursor-pointer">
+              <span class="font-mono font-bold text-[11px] text-blue-600 dark:text-blue-400">${o.unit}</span>
+              <span class="truncate flex-1 text-[var(--text-main)]">${o.name}</span>
+              <span class="font-mono text-[10px] text-[var(--text-muted)]">#${o.pe}</span>
+            </button>
+          `).join('')}
+        </div>
+      `;
+      menu.classList.remove('hidden');
+      positionPopoverNearEvent(event, menu);
+    }
+
+    function assignOfficerToShiftNotice(noticeId, div, unit, pe) {
+      const notice = (app.shiftNotices || []).find(n => n.id === noticeId);
+      if (!notice) return;
+      // Clear previous officer's notice stamp if any
+      if (notice.assignedUnit && notice.assignedDiv) {
+        const prev = (app.officers[notice.assignedDiv] || []).find(r => r.unit === notice.assignedUnit);
+        if (prev && (prev.assign === 'GD' || prev.assign === 'DETAIL' || prev.assign === 'SE')) {
+          prev.assign = '';
+        }
+      }
+      const row = (app.officers[div] || []).find(r => r.unit === unit && r.pe === pe);
+      if (!row) return;
+      notice.assignedUnit = unit;
+      notice.assignedDiv = div;
+      notice.assignedName = row.name;
+      notice.assignedPe = pe;
+      const code = getShiftNoticeStyle(notice.type).code;
+      if (code) row.assign = code;
+      app.auditEntries.unshift({
+        time: new Date().toTimeString().slice(0, 5),
+        msg: `Assigned ${row.name} (${unit}) to ${getShiftNoticeStyle(notice.type).label}: ${notice.text}`,
+        tag: 'Shift Notice'
+      });
+      closeActionPopover();
+      renderAll();
+    }
+
+    function unassignOfficerFromShiftNotice(noticeId) {
+      const notice = (app.shiftNotices || []).find(n => n.id === noticeId);
+      if (!notice) return;
+      if (notice.assignedUnit && notice.assignedDiv) {
+        const prev = (app.officers[notice.assignedDiv] || []).find(r => r.unit === notice.assignedUnit);
+        if (prev && (prev.assign === 'GD' || prev.assign === 'DETAIL' || prev.assign === 'SE')) {
+          prev.assign = '';
+        }
+      }
+      notice.assignedUnit = '';
+      notice.assignedDiv = '';
+      notice.assignedName = '';
+      notice.assignedPe = null;
+      closeActionPopover();
+      renderAll();
+    }
+
+    function removeShiftNotice(noticeId) {
+      const notice = (app.shiftNotices || []).find(n => n.id === noticeId);
+      if (notice && notice.assignedUnit && notice.assignedDiv) {
+        const prev = (app.officers[notice.assignedDiv] || []).find(r => r.unit === notice.assignedUnit);
+        if (prev && (prev.assign === 'GD' || prev.assign === 'DETAIL' || prev.assign === 'SE')) {
+          prev.assign = '';
+        }
+      }
+      app.shiftNotices = (app.shiftNotices || []).filter(n => n.id !== noticeId);
+      renderAll();
     }
 
     function renderToast() {
